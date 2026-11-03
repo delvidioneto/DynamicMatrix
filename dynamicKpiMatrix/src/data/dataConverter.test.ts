@@ -350,6 +350,83 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(view.rows[0].cells[0].complements[0].value.raw === 0.4, "row complement independent");
 }
 
+// Total Geral: KPI no isSubtotal, complementos só em root.values (ambos contexto de total)
+{
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    values: {
+                        0: { value: 100, valueSourceIndex: 0 },
+                        1: { value: 0.62, valueSourceIndex: 1 },
+                        2: { value: 0.91, valueSourceIndex: 2 },
+                    },
+                    objects: {
+                        kpiStyle: {
+                            complement1FontColor: { solid: { color: "#107C10" } },
+                            complement2FontColor: { solid: { color: "#D13438" } },
+                        },
+                    },
+                    children: [
+                        {
+                            isSubtotal: true,
+                            values: {
+                                0: { value: 100, valueSourceIndex: 0 },
+                            },
+                        },
+                        {
+                            value: "Surgery",
+                            values: {
+                                0: { value: 40, valueSourceIndex: 0 },
+                                1: { value: 0.4, valueSourceIndex: 1 },
+                                2: { value: 0.7, valueSourceIndex: 2 },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Delivery", roles: { kpis: true } },
+                { queryName: "ibp", displayName: "IBP %", roles: { complements: true }, format: "0%" },
+                { queryName: "quota", displayName: "Quota %", roles: { complements: true }, format: "0%" },
+            ],
+        },
+        metadata: {
+            columns: [
+                {
+                    queryName: "kpiA",
+                    roles: { kpis: true },
+                    objects: {
+                        kpiStyle: {
+                            complement1: "ibp",
+                            complement2: "quota",
+                            complement1Label: "IBP",
+                            complement2Label: "Quota",
+                        },
+                    },
+                },
+                { queryName: "ibp", roles: { complements: true } },
+                { queryName: "quota", roles: { complements: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total Geral",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: true,
+    });
+    const totalCell = view.totalRow!.cells[0];
+    assert(totalCell.primary.raw === 100, "total primary from subtotal");
+    assert(totalCell.complements.length === 2, "total has two complement slots");
+    assert(totalCell.complements[0].value.raw === 0.62, "comp1 from root total context");
+    assert(totalCell.complements[1].value.raw === 0.91, "comp2 from root total context");
+    assert(totalCell.complements[0].fontColor === "#107C10", "comp1 CF from total objects");
+    assert(totalCell.complements[1].fontColor === "#D13438", "comp2 CF from total objects");
+    assert(view.rows[0].cells[0].complements[0].value.raw === 0.4, "category row unchanged");
+}
+
 // Indicador percentual: a chave da célula não é o índice da medida
 {
     const dataView = {
