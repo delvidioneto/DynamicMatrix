@@ -6,6 +6,7 @@ import { buildKpiColumns, collectMeasures } from "./kpiMapper";
 import { CategoryMetaMap, findCategoryMeta, parseCategoryMetaMap } from "./categoryMeta";
 import {
     ComplementValue,
+    DisplayMode,
     KpiCellData,
     KpiColumnConfig,
     MatrixRow,
@@ -160,6 +161,32 @@ function buildCell(
     return applyConditionalColors(cell, column);
 }
 
+function resolveRowIconMeasure(
+    metaMap: CategoryMetaMap,
+    category: string,
+    isTotal: boolean,
+    measures: MeasureRef[],
+    totalIconQueryName?: string,
+): MeasureRef | undefined {
+    const icons = measures.filter((m) => m.role === "categoryIcon");
+    if (!icons.length) {
+        return undefined;
+    }
+    if (isTotal) {
+        const preferred = (totalIconQueryName || "").trim();
+        if (!preferred) {
+            return undefined;
+        }
+        return icons.find((m) => m.queryName === preferred);
+    }
+    const meta = findCategoryMeta(metaMap, category);
+    const preferred = (meta?.iconQueryName || "").trim();
+    if (!preferred) {
+        return undefined;
+    }
+    return icons.find((m) => m.queryName === preferred);
+}
+
 function toRow(
     node: DataViewMatrixNode,
     index: number,
@@ -168,21 +195,34 @@ function toRow(
     metaMap: CategoryMetaMap,
     totalLabel: string,
     formatOpts?: ValueFormatOptions,
-    iconMeasure?: MeasureRef,
+    totalIconQueryName?: string,
+    totalDisplayMode?: DisplayMode,
+    forceTotal = false,
 ): MatrixRow {
-    const isTotal = isSubtotalNode(node);
+    const isTotal = forceTotal || isSubtotalNode(node);
     const category = isTotal ? totalLabel : nodeValue(node);
     const meta = isTotal ? undefined : findCategoryMeta(metaMap, category);
+    const iconMeasure = resolveRowIconMeasure(
+        metaMap,
+        category,
+        isTotal,
+        measures,
+        totalIconQueryName,
+    );
     const iconRaw = iconMeasure
         ? unwrapMeasureText(String(readMatrixValue(node, iconMeasure.valueSourceIndex) ?? ""))
         : "";
     const tooltips = measures.filter((m) => m.role === "tooltips");
     const customTitle = meta?.title?.trim();
+    const displayMode: DisplayMode = isTotal
+        ? totalDisplayMode || "both"
+        : meta?.displayMode || "text";
 
     return {
         category,
         categoryKey: category,
         displayTitle: isTotal ? totalLabel : customTitle || category,
+        displayMode,
         iconRaw,
         iconPersisted: meta?.imageUrl,
         isTotal,
@@ -244,6 +284,7 @@ function sumTotalFromRows(
         category: totalLabel,
         categoryKey: totalLabel,
         displayTitle: totalLabel,
+        displayMode: "text",
         iconRaw: "",
         isTotal: true,
         sourceIndex: -1,
@@ -252,25 +293,13 @@ function sumTotalFromRows(
     };
 }
 
-function sortRows(rows: MatrixRow[], sortMode: SortMode, sortKpiQueryName: string): MatrixRow[] {
+function sortRows(rows: MatrixRow[], sortMode: SortMode): MatrixRow[] {
     if (sortMode === "data") {
         return rows;
     }
     const copy = [...rows];
-    if (sortMode === "alphaAsc" || sortMode === "alphaDesc") {
-        copy.sort((a, b) => a.displayTitle.localeCompare(b.displayTitle, "pt-BR"));
-        return sortMode === "alphaDesc" ? copy.reverse() : copy;
-    }
-
-    const kpiKey = sortKpiQueryName;
-    copy.sort((a, b) => {
-        const av = a.cells.find((c) => c.queryName === kpiKey)?.primary.raw;
-        const bv = b.cells.find((c) => c.queryName === kpiKey)?.primary.raw;
-        const an = av == null ? Number.NEGATIVE_INFINITY : av;
-        const bn = bv == null ? Number.NEGATIVE_INFINITY : bv;
-        return an - bn;
-    });
-    return sortMode === "kpiDesc" ? copy.reverse() : copy;
+    copy.sort((a, b) => a.displayTitle.localeCompare(b.displayTitle, "pt-BR"));
+    return sortMode === "alphaDesc" ? copy.reverse() : copy;
 }
 
 function columnObjectsMap(dataView: DataView): Map<string, powerbi.DataViewObjects | undefined> {
@@ -288,31 +317,13 @@ function columnObjectsMap(dataView: DataView): Map<string, powerbi.DataViewObjec
 export interface ConvertOptions {
     totalLabel: string;
     sortMode: SortMode;
-    sortKpiQueryName: string;
     categoriesJson: string;
     imagesJson?: string;
     showTotal: boolean;
     displayUnits?: number;
     precision?: number;
-    categoryIconQueryName?: string;
     grandTotalIconQueryName?: string;
-}
-
-function pickIconMeasure(
-    measures: MeasureRef[],
-    preferredQueryName: string | undefined,
-): MeasureRef | undefined {
-    const icons = measures.filter((m) => m.role === "categoryIcon");
-    if (!icons.length) {
-        return undefined;
-    }
-    if (preferredQueryName) {
-        const match = icons.find((m) => m.queryName === preferredQueryName);
-        if (match) {
-            return match;
-        }
-    }
-    return icons[0];
+    grandTotalDisplayMode?: DisplayMode;
 }
 
 export function convertDataView(dataView: DataView | undefined, options: ConvertOptions): VisualViewModel {
@@ -340,8 +351,6 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
         displayUnits: options.displayUnits,
         precision: options.precision,
     };
-    const categoryIcon = pickIconMeasure(measures, options.categoryIconQueryName);
-    const totalIcon = pickIconMeasure(measures, options.grandTotalIconQueryName);
     const root = matrix.rows?.root;
     const rootChildren = root?.children ?? [];
 
@@ -349,9 +358,19 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
     const dataNodes = rootChildren.filter((n) => !isSubtotalNode(n));
 
     const dataRows = dataNodes.map((node, i) =>
-        toRow(node, i, columns, measures, metaMap, options.totalLabel, formatOpts, categoryIcon),
+        toRow(
+            node,
+            i,
+            columns,
+            measures,
+            metaMap,
+            options.totalLabel,
+            formatOpts,
+            options.grandTotalIconQueryName,
+            options.grandTotalDisplayMode,
+        ),
     );
-    const sorted = sortRows(dataRows, options.sortMode, options.sortKpiQueryName);
+    const sorted = sortRows(dataRows, options.sortMode);
 
     let totalRow: MatrixRow | undefined;
     if (options.showTotal) {
@@ -365,11 +384,23 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
                 metaMap,
                 options.totalLabel,
                 formatOpts,
-                totalIcon,
+                options.grandTotalIconQueryName,
+                options.grandTotalDisplayMode,
+                true,
             );
         } else if (root && nodeHasAnyValue(root, columns)) {
-            totalRow = toRow(root, -1, columns, measures, metaMap, options.totalLabel, formatOpts, totalIcon);
-            totalRow.isTotal = true;
+            totalRow = toRow(
+                root,
+                -1,
+                columns,
+                measures,
+                metaMap,
+                options.totalLabel,
+                formatOpts,
+                options.grandTotalIconQueryName,
+                options.grandTotalDisplayMode,
+                true,
+            );
         } else if (sorted.length) {
             // Fallback: soma das linhas visíveis (quando o host não envia subtotal DAX).
             totalRow = sumTotalFromRows(sorted, columns, measures, options.totalLabel, formatOpts);
@@ -379,11 +410,8 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             totalRow.category = options.totalLabel;
             totalRow.categoryKey = options.totalLabel;
             totalRow.displayTitle = options.totalLabel;
+            totalRow.displayMode = options.grandTotalDisplayMode || "both";
             totalRow.isTotal = true;
-            // Garante ícone do total mesmo no fallback de soma.
-            if (!totalRow.iconRaw && totalIcon) {
-                totalRow.iconRaw = "";
-            }
         }
     }
 

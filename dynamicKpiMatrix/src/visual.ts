@@ -135,7 +135,7 @@ export class Visual implements IVisual {
                 this.stickySelectedCategory,
             );
         }
-        this.formattingSettings.categoryImages.onPreProcess();
+        this.formattingSettings.categories.onPreProcess();
         this.formattingSettings.grandTotal.onPreProcess();
         this.formattingSettings.columns.onPreProcess();
         this.formattingSettings.values.onPreProcess();
@@ -181,7 +181,6 @@ export class Visual implements IVisual {
             const payload = this.formattingSettings.getEditorImagePayload();
             if (payload.imageUrl) {
                 this.categoryImageCache[selected] = payload.imageUrl;
-                this.formattingSettings.categoryImages.imageUrl.value = payload.imageUrl;
             }
             if (synced !== current && synced !== this.lastPersistedCategoriesJson) {
                 this.lastPersistedCategoriesJson = synced;
@@ -189,15 +188,15 @@ export class Visual implements IVisual {
                 const props: Record<string, unknown> = {
                     categoriesJson: synced,
                     selectedCategory: selected,
-                    imageType: this.formattingSettings.getCategoryImageType(),
+                    categoryTitle: this.formattingSettings.categoryImages.categoryTitle.value || "",
+                    categoryDisplayMode: this.formattingSettings.getCategoryEditorDisplayMode(),
+                    categoryIconMeasure:
+                        this.formattingSettings.getCategoryEditorIconQueryName() || "",
                 };
-                if (payload.imageUrl) {
-                    props.imageUrl = payload.imageUrl;
-                }
                 this.visualHost.persistProperties({
                     merge: [
                         {
-                            objectName: "categoryImages",
+                            objectName: "categories",
                             selector: null as unknown as powerbi.data.Selector,
                             properties: props,
                         },

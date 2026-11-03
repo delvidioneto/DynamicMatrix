@@ -176,6 +176,39 @@
     justify-content: center;
     gap: 4px;
     overflow: hidden;
+    position: relative;
+}
+
+/* Bordas L/R só na altura do conteúdo, centralizadas na célula. */
+.dkm-kpi-vcontent {
+    gap: 0;
+}
+
+.dkm-kpi-frame {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* Barras L/R com altura personalizada (px), centradas verticalmente. */
+.dkm-vborder {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.dkm-vborder-l {
+    left: 0;
+}
+
+.dkm-vborder-r {
+    right: 0;
 }
 
 .dkm-primary {
@@ -192,24 +225,21 @@
 .dkm-comps {
     display: flex;
     gap: 6px 14px;
+    width: 100%;
     min-width: 0;
 }
 
 .dkm-layout-vertical .dkm-comps {
     flex-direction: column;
     flex-wrap: nowrap;
-    align-items: flex-start;
+    align-items: stretch;
 }
 
 .dkm-layout-horizontal .dkm-comps {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: flex-start;
-}
-
-.dkm-layout-horizontal .dkm-comp {
-    flex: 1 1 0;
-    min-width: 0;
+    justify-content: flex-start;
 }
 
 .dkm-comp {
@@ -217,8 +247,10 @@
     flex-direction: column;
     gap: 1px;
     min-width: 0;
+    overflow: hidden;
     border-radius: 2px;
     padding: 1px 2px;
+    box-sizing: border-box;
 }
 
 .dkm-comp-label {

@@ -35,7 +35,7 @@ No painel **Dados** do visual:
 | **Categorias** | Sim (1 coluna) | Dimensão da linha (produto, região, franquia, etc.) |
 | **Valores** | Sim (≥ 1 medida) | Cada medida vira uma **coluna** da matriz |
 | **Informações complementares** | Não | Pool de medidas auxiliares (IBP, Quota, YoY, etc.) |
-| **Ícone da categoria** | Não | Medida com URL, data URI PNG ou SVG em texto (pode vir entre aspas) |
+| **SVG** | Não | Medidas DAX que retornam código SVG (associadas por categoria / Total no Formatar) |
 | **Dicas de ferramentas** | Não | Medidas extras só para o tooltip da categoria |
 
 A **ordem** das medidas em **Valores** define a ordem das colunas.
@@ -63,10 +63,9 @@ Principais cards no painel **Formato**:
 | Card | Para quê |
 | --- | --- |
 | **Aparência Geral** | Fonte, fundo e tipografia base |
-| **Categorias** | Largura da coluna de categorias, alinhamento, tamanho/posição da imagem, ordenação |
-| **Imagens das categorias** | Dropdown da categoria → título customizado → tipo **PNG (upload)** ou **SVG (medida/texto)** |
+| **Categorias** | **Geral**: largura, tipografia, tamanho/posição da imagem, ordenação. **Imagens**: por categoria — Exibição (texto / imagem / ambos), Texto e SVG |
 | **Valores** | Tamanho, cor, alinhamento, **unidades de exibição** (Automático / Nenhum / Milhares / Milhões / Bilhões / Trilhões), casas decimais e **bordas por lado** (esquerda, direita, cima, baixo) no bloco valor + complementos |
-| **Total Geral** | Exibir/ocultar, texto, modo texto/imagem/ambos, tipo PNG ou SVG, estilo da linha |
+| **Total Geral** | Exibir/ocultar, **Exibição** (texto / imagem / ambos), Texto, SVG, estilo da linha |
 | **Cabeçalho** | Estilo dos títulos das colunas |
 | **Linhas** | Zebra, cores, borda da linha, altura e espaçamento |
 | **Colunas** | Fundo, **ligar/desligar borda** da grade, largura e espaçamento entre colunas |
@@ -80,21 +79,13 @@ A linha de total usa o **subtotal da Matrix DataView** (contexto total do modelo
 
 Se o host não enviar subtotal, o visual faz fallback pela soma das linhas visíveis.
 
-### 5. Imagens
+### 5. Imagens (SVG via medida DAX)
 
-**Categorias**
+1. Arraste uma ou mais medidas que retornam SVG para o well **SVG** no painel Dados.
+2. **Categorias → Imagens**: selecione a categoria → escolha **Exibição** → preencha **Texto** e/ou **SVG** conforme o modo. Cada categoria é independente; o texto customizado não altera a identidade usada em filtros/seleção.
+3. **Total Geral**: **Exibição** primeiro → **Texto** e/ou **SVG** (medida avaliada no contexto do total).
 
-1. Em **Imagens das categorias**, selecione a categoria no dropdown (a seleção permanece ao editar).
-2. Opcional: defina um **Título** (senão usa o nome da tabela).
-3. **Tipo de imagem**:
-   - **PNG (upload)** — importe o arquivo;
-   - **SVG (medida/texto)** — cole o SVG ou use a medida em **Ícone da categoria** (aceita texto entre aspas, ex.: `"<svg>…</svg>"`).
-
-**Total Geral**
-
-- Mesma lógica: tipo PNG (upload) ou SVG (texto / medida no total).
-
-Imagens grandes são **redimensionadas** para caber na largura da coluna (`object-fit: contain`).
+SVGs são sanitizados (scripts, eventos e URLs externas removidos) e cabem na célula sem distorção (`object-fit: contain`).
 
 ### 6. Tooltip
 
@@ -139,7 +130,7 @@ No card **Indicadores por KPI → Complementos → Elemento da célula**, as cor
 Categorias .............. 'Produto'[Nome]
 Valores ................. [Faturamento], [Margem %]
 Informações complementares [IBP], [Quota], [YoY]
-Ícone da categoria ...... [Produto SVG]   // opcional
+SVG ..................... [Produto SVG], [Total SVG]   // opcional
 Dicas de ferramentas .... [Qtd pedidos]   // opcional
 ```
 

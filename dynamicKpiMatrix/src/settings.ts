@@ -10,11 +10,12 @@ import {
     Align,
     ImagePlacement,
     ImageSourceType,
+    VerticalBorderHeight,
 } from "./data/viewModel";
 import {
     CategoryMetaMap,
     findCategoryMeta,
-    imageValueFromMeta,
+    mergeCategoryNames,
     metaFromImageValue,
     parseCategoryMetaMap,
     serializeCategoryMetaMap,
@@ -25,6 +26,8 @@ import { coerceImageValue, imageValueToStorage, unwrapMeasureText } from "./serv
 import FormattingSettingsCard = formattingSettings.SimpleCard;
 import FormattingSettingsSlice = formattingSettings.Slice;
 import FormattingSettingsModel = formattingSettings.Model;
+import FormattingSettingsCompositeCard = formattingSettings.CompositeCard;
+import FormattingSettingsGroup = formattingSettings.Group;
 
 const EMPTY_IMAGE: powerbi.ImageValue = { name: "", url: "", scaling: "normal" };
 const PLACEHOLDER_CATEGORY = { value: "", displayName: "(selecione uma categoria)" };
@@ -33,14 +36,12 @@ const SORT_MODES = [
     { value: "data", displayName: "Ordem dos dados" },
     { value: "alphaAsc", displayName: "Alfabética A–Z" },
     { value: "alphaDesc", displayName: "Alfabética Z–A" },
-    { value: "kpiAsc", displayName: "Por KPI (crescente)" },
-    { value: "kpiDesc", displayName: "Por KPI (decrescente)" },
 ];
 
 const DISPLAY_MODES = [
-    { value: "both", displayName: "Texto e imagem" },
     { value: "text", displayName: "Somente texto" },
     { value: "image", displayName: "Somente imagem" },
+    { value: "both", displayName: "Texto e imagem" },
 ];
 
 const NONE_ICON = { value: "", displayName: "(nenhuma medida SVG)" };
@@ -60,6 +61,12 @@ const WEIGHTS = [
     { value: "400", displayName: "Regular" },
     { value: "600", displayName: "Semibold" },
     { value: "700", displayName: "Bold" },
+];
+
+const VERTICAL_BORDER_HEIGHTS = [
+    { value: "full", displayName: "Completa" },
+    { value: "content", displayName: "Somente área do valor" },
+    { value: "custom", displayName: "Personalizada" },
 ];
 
 function color(name: string, displayName: string, value: string) {
@@ -95,7 +102,12 @@ function toggle(name: string, displayName: string, value: boolean) {
     });
 }
 
-function dropdown(name: string, displayName: string, value: string, items: Array<{ value: string; displayName: string }>) {
+function dropdown(
+    name: string,
+    displayName: string,
+    value: string,
+    items: Array<{ value: string; displayName: string }>,
+) {
     return new formattingSettings.ItemDropdown({
         name,
         displayName,
@@ -104,8 +116,14 @@ function dropdown(name: string, displayName: string, value: string, items: Array
     });
 }
 
-function asImageType(value: unknown): ImageSourceType {
-    return String(value) === "svg" ? "svg" : "png";
+function asDisplayMode(value: unknown, fallback: DisplayMode = "text"): DisplayMode {
+    const raw = String(
+        (value as { value?: string } | undefined)?.value ?? value ?? "",
+    ).trim();
+    if (raw === "text" || raw === "image" || raw === "both") {
+        return raw;
+    }
+    return fallback;
 }
 
 class GeneralCard extends FormattingSettingsCard {
@@ -140,7 +158,7 @@ class GeneralCard extends FormattingSettingsCard {
     ];
 }
 
-class CategoriesCard extends FormattingSettingsCard {
+class CategoriesGeralGroup extends FormattingSettingsGroup {
     width = num("width", "Largura da coluna", defaultStyle.categoryWidth);
     fontSize = num("fontSize", "Tamanho da fonte", defaultStyle.categoryFontSize);
     fontColor = color("fontColor", "Cor da fonte", defaultStyle.categoryFontColor);
@@ -149,10 +167,9 @@ class CategoriesCard extends FormattingSettingsCard {
     imageSize = num("imageSize", "Tamanho da imagem", defaultStyle.imageSize);
     imagePlacement = dropdown("imagePlacement", "Posição da imagem", defaultStyle.imagePlacement, IMAGE_PLACES);
     sortMode = dropdown("sortMode", "Ordenação", defaultStyle.sortMode, SORT_MODES);
-    sortKpiQueryName = text("sortKpiQueryName", "KPI para ordenação (queryName)", "", "queryName do KPI");
 
-    name = "categories";
-    displayName = "Categorias";
+    name = "categoriesGeral";
+    displayName = "Geral";
     slices: FormattingSettingsSlice[] = [
         this.width,
         this.fontSize,
@@ -162,41 +179,29 @@ class CategoriesCard extends FormattingSettingsCard {
         this.imageSize,
         this.imagePlacement,
         this.sortMode,
-        this.sortKpiQueryName,
     ];
+
+    constructor() {
+        super({ name: "categoriesGeral", slices: [] });
+    }
 }
 
-class CategoryImagesCard extends FormattingSettingsCard {
-    iconMeasure = new formattingSettings.ItemDropdown({
-        name: "iconMeasure",
-        displayName: "Medida SVG (linhas)",
-        items: [NONE_ICON],
-        value: NONE_ICON,
-    });
+class CategoriesImagensGroup extends FormattingSettingsGroup {
     selectedCategory = new formattingSettings.ItemDropdown({
         name: "selectedCategory",
-        displayName: "Categoria (título)",
+        displayName: "Categoria",
         items: [PLACEHOLDER_CATEGORY],
         value: PLACEHOLDER_CATEGORY,
     });
-    categoryTitle = text("categoryTitle", "Título", "", "Deixe vazio para usar o nome da tabela");
-    // Legado (oculto) — mantém persistência antiga sem poluir o painel.
-    imageType = dropdown("imageType", "Tipo de imagem", "svg", [
-        { value: "svg", displayName: "SVG" },
-        { value: "png", displayName: "PNG" },
-    ]);
-    imageData = new formattingSettings.ImageUpload({
-        name: "imageData",
-        displayName: "Upload PNG",
-        value: { ...EMPTY_IMAGE },
+    categoryDisplayMode = dropdown("categoryDisplayMode", "Exibição", "text", DISPLAY_MODES);
+    categoryTitle = text("categoryTitle", "Texto", "", "Texto exibido na célula");
+    categoryIconMeasure = new formattingSettings.ItemDropdown({
+        name: "categoryIconMeasure",
+        displayName: "SVG",
+        items: [NONE_ICON],
+        value: NONE_ICON,
     });
-    imageUrl = text("imageUrl", "URL ou data URI", "", "");
-    svgMarkup = new formattingSettings.TextArea({
-        name: "svgMarkup",
-        displayName: "SVG (texto)",
-        value: "",
-        placeholder: "",
-    });
+    // Persistência (oculta)
     categoriesJson = new formattingSettings.TextArea({
         name: "categoriesJson",
         displayName: "Mapa persistido",
@@ -210,33 +215,53 @@ class CategoryImagesCard extends FormattingSettingsCard {
         placeholder: "{}",
     });
 
-    name = "categoryImages";
-    displayName = "Imagens das categorias";
-    description =
-        "Arraste medidas SVG em Ícone da categoria e selecione qual usar nas linhas. O tamanho vem do SVG da medida.";
+    name = "categoriesImagens";
+    displayName = "Imagens";
     slices: FormattingSettingsSlice[] = [
-        this.iconMeasure,
         this.selectedCategory,
+        this.categoryDisplayMode,
         this.categoryTitle,
+        this.categoryIconMeasure,
+        this.categoriesJson,
+        this.imagesJson,
     ];
 
-    public onPreProcess(): void {
-        this.imageType.visible = false;
-        this.imageData.visible = false;
-        this.imageUrl.visible = false;
-        this.svgMarkup.visible = false;
-        this.imagesJson.visible = false;
+    constructor() {
+        super({ name: "categoriesImagens", slices: [] });
+    }
+
+    public applyVisibility(): void {
+        const selected = String(this.selectedCategory.value?.value ?? "").trim();
+        const hasSelection = Boolean(selected);
+        const mode = asDisplayMode(this.categoryDisplayMode.value, "text");
+        this.categoryDisplayMode.visible = hasSelection;
+        this.categoryTitle.visible = hasSelection && (mode === "text" || mode === "both");
+        this.categoryIconMeasure.visible = hasSelection && (mode === "image" || mode === "both");
         this.categoriesJson.visible = false;
+        this.imagesJson.visible = false;
+    }
+}
+
+class CategoriesCard extends FormattingSettingsCompositeCard {
+    geral = new CategoriesGeralGroup();
+    imagens = new CategoriesImagensGroup();
+
+    name = "categories";
+    displayName = "Categorias";
+    groups = [this.geral, this.imagens];
+
+    public onPreProcess(): void {
+        this.imagens.applyVisibility();
     }
 }
 
 class GrandTotalCard extends FormattingSettingsCard {
     show = toggle("show", "Exibir Total Geral", defaultStyle.grandTotalShow);
-    label = text("label", "Texto", defaultStyle.grandTotalLabel, "Total Geral");
     displayMode = dropdown("displayMode", "Exibição", "both", DISPLAY_MODES);
+    label = text("label", "Texto", defaultStyle.grandTotalLabel, "Total Geral");
     iconMeasure = new formattingSettings.ItemDropdown({
         name: "iconMeasure",
-        displayName: "Medida SVG (total)",
+        displayName: "SVG",
         items: [NONE_ICON],
         value: NONE_ICON,
     });
@@ -267,8 +292,8 @@ class GrandTotalCard extends FormattingSettingsCard {
     displayName = "Total Geral";
     topLevelSlice = this.show;
     slices: FormattingSettingsSlice[] = [
-        this.label,
         this.displayMode,
+        this.label,
         this.iconMeasure,
         this.fontSize,
         this.fontColor,
@@ -279,6 +304,9 @@ class GrandTotalCard extends FormattingSettingsCard {
     ];
 
     public onPreProcess(): void {
+        const mode = asDisplayMode(this.displayMode.value, "both");
+        this.label.visible = mode === "text" || mode === "both";
+        this.iconMeasure.visible = mode === "image" || mode === "both";
         this.imageType.visible = false;
         this.imageData.visible = false;
         this.imageUrl.visible = false;
@@ -357,9 +385,20 @@ class ValuesCard extends FormattingSettingsCard {
     borderRight = toggle("borderRight", "Borda direita", defaultStyle.valueBorderRight);
     borderTop = toggle("borderTop", "Borda superior", defaultStyle.valueBorderTop);
     borderBottom = toggle("borderBottom", "Borda inferior", defaultStyle.valueBorderBottom);
+    verticalBorderHeight = dropdown(
+        "verticalBorderHeight",
+        "Altura da borda vertical",
+        defaultStyle.valueVerticalBorderHeight,
+        VERTICAL_BORDER_HEIGHTS,
+    );
+    verticalBorderCustomHeight = num(
+        "verticalBorderCustomHeight",
+        "Altura personalizada (px)",
+        defaultStyle.valueVerticalBorderCustomHeight,
+    );
     borderColor = color("borderColor", "Cor da borda", defaultStyle.valueBorderColor);
     borderWidth = num("borderWidth", "Espessura da borda", defaultStyle.valueBorderWidth);
-    borderRadius = num("borderRadius", "Arredondamento", defaultStyle.valueBorderRadius);
+    borderRadius = num("borderRadius", "Arredondamento da borda", defaultStyle.valueBorderRadius);
 
     name = "values";
     displayName = "Valores";
@@ -375,6 +414,8 @@ class ValuesCard extends FormattingSettingsCard {
         this.borderRight,
         this.borderTop,
         this.borderBottom,
+        this.verticalBorderHeight,
+        this.verticalBorderCustomHeight,
         this.borderColor,
         this.borderWidth,
         this.borderRadius,
@@ -386,6 +427,10 @@ class ValuesCard extends FormattingSettingsCard {
             this.borderRight.value ||
             this.borderTop.value ||
             this.borderBottom.value;
+        const anyVertical = this.borderLeft.value || this.borderRight.value;
+        const vMode = String(this.verticalBorderHeight.value?.value ?? "full");
+        this.verticalBorderHeight.visible = anyVertical;
+        this.verticalBorderCustomHeight.visible = anyVertical && vMode === "custom";
         this.borderColor.visible = anyBorder;
         this.borderWidth.visible = anyBorder;
         this.borderRadius.visible = anyBorder;
@@ -427,7 +472,6 @@ class TooltipCard extends FormattingSettingsCard {
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     general = new GeneralCard();
     categories = new CategoriesCard();
-    categoryImages = new CategoryImagesCard();
     values = new ValuesCard();
     grandTotal = new GrandTotalCard();
     header = new HeaderCard();
@@ -439,7 +483,6 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     cards = [
         this.general,
         this.categories,
-        this.categoryImages,
         this.values,
         this.grandTotal,
         this.header,
@@ -449,62 +492,77 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         this.tooltip,
     ];
 
+    /** Acesso curto ao grupo Imagens. */
+    get categoryImages(): CategoriesImagensGroup {
+        return this.categories.imagens;
+    }
+
+    /** Acesso curto ao grupo Geral. */
+    get categoriesGeral(): CategoriesGeralGroup {
+        return this.categories.geral;
+    }
+
     /**
-     * Recupera ImageUpload / selectedCategory a partir dos objects brutos.
-     * O util oficial descarta ImageValue (objeto sem .solid) e o dropdown
-     * falha se a lista de itens ainda não tem as categorias.
+     * Recupera selectedCategory / medidas SVG a partir dos objects brutos
+     * (incluindo object legado categoryImages).
      */
     public hydrateFromDataViewObjects(objects: powerbi.DataViewObjects | undefined): void {
         if (!objects) {
             return;
         }
 
-        const catObj = objects.categoryImages as Record<string, unknown> | undefined;
-        if (catObj) {
-            const selectedRaw = catObj.selectedCategory;
-            const selectedName =
-                typeof selectedRaw === "string"
-                    ? selectedRaw.trim()
-                    : String((selectedRaw as { value?: string } | undefined)?.value ?? "").trim();
-            if (selectedName) {
-                this.ensureSelectedCategoryItem(selectedName);
-            }
+        const catObj = objects.categories as Record<string, unknown> | undefined;
+        const legacyObj = objects.categoryImages as Record<string, unknown> | undefined;
+        const source = { ...(legacyObj ?? {}), ...(catObj ?? {}) };
 
-            if (typeof catObj.iconMeasure === "string" && catObj.iconMeasure.trim()) {
-                this.ensureIconMeasureItem(
-                    this.categoryImages.iconMeasure,
-                    catObj.iconMeasure.trim(),
-                );
-            }
+        const selectedRaw = source.selectedCategory;
+        const selectedName =
+            typeof selectedRaw === "string"
+                ? selectedRaw.trim()
+                : String((selectedRaw as { value?: string } | undefined)?.value ?? "").trim();
+        if (selectedName) {
+            this.ensureSelectedCategoryItem(selectedName);
+        }
 
-            const upload = coerceImageValue(catObj.imageData);
-            const urlText = unwrapMeasureText(
-                typeof catObj.imageUrl === "string" ? catObj.imageUrl : String(catObj.imageUrl ?? ""),
-            );
-            const svgText = unwrapMeasureText(
-                typeof catObj.svgMarkup === "string" ? catObj.svgMarkup : String(catObj.svgMarkup ?? ""),
-            );
-            const resolvedUrl = upload.url || urlText;
-            if (resolvedUrl) {
-                this.categoryImages.imageData.value = {
-                    name: upload.name || "image",
-                    url: resolvedUrl,
-                    scaling: upload.scaling || "normal",
-                };
-                this.categoryImages.imageUrl.value = resolvedUrl;
-            }
-            // Se o populate deixou imageData como string (text capability), normaliza.
-            const rawUpload = this.categoryImages.imageData.value as unknown;
-            if (typeof rawUpload === "string" && rawUpload.trim()) {
-                const coerced = coerceImageValue(rawUpload);
-                if (coerced.url) {
-                    this.categoryImages.imageData.value = coerced;
-                    this.categoryImages.imageUrl.value = coerced.url;
-                }
-            }
-            if (svgText) {
-                this.categoryImages.svgMarkup.value = svgText;
-            }
+        const jsonFromCat =
+            typeof catObj?.categoriesJson === "string" ? catObj.categoriesJson : "";
+        const jsonFromLegacy =
+            typeof legacyObj?.categoriesJson === "string" ? legacyObj.categoriesJson : "";
+        if (jsonFromCat.trim()) {
+            this.categoryImages.categoriesJson.value = jsonFromCat;
+        } else if (jsonFromLegacy.trim() && !this.categoryImages.categoriesJson.value?.trim()) {
+            this.categoryImages.categoriesJson.value = jsonFromLegacy;
+        }
+
+        const imagesFromCat = typeof catObj?.imagesJson === "string" ? catObj.imagesJson : "";
+        const imagesFromLegacy =
+            typeof legacyObj?.imagesJson === "string" ? legacyObj.imagesJson : "";
+        if (imagesFromCat.trim()) {
+            this.categoryImages.imagesJson.value = imagesFromCat;
+        } else if (imagesFromLegacy.trim() && !this.categoryImages.imagesJson.value?.trim()) {
+            this.categoryImages.imagesJson.value = imagesFromLegacy;
+        }
+
+        const titleRaw = source.categoryTitle;
+        if (typeof titleRaw === "string") {
+            this.categoryImages.categoryTitle.value = titleRaw;
+        }
+
+        const modeRaw = source.categoryDisplayMode;
+        if (modeRaw != null) {
+            const mode = asDisplayMode(modeRaw, "text");
+            const match = DISPLAY_MODES.find((i) => i.value === mode) ?? DISPLAY_MODES[0];
+            this.categoryImages.categoryDisplayMode.value = match;
+        }
+
+        const iconQn =
+            typeof source.categoryIconMeasure === "string"
+                ? source.categoryIconMeasure.trim()
+                : typeof source.iconMeasure === "string"
+                  ? source.iconMeasure.trim()
+                  : "";
+        if (iconQn) {
+            this.ensureIconMeasureItem(this.categoryImages.categoryIconMeasure, iconQn);
         }
 
         const gtObj = objects.grandTotal as Record<string, unknown> | undefined;
@@ -556,20 +614,20 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     }
 
     private ensureIconMeasureItem(
-        dropdown: formattingSettings.ItemDropdown,
+        dropdownCtrl: formattingSettings.ItemDropdown,
         queryName: string,
         displayName?: string,
     ): void {
-        const items = dropdown.items ?? [NONE_ICON];
+        const items = dropdownCtrl.items ?? [NONE_ICON];
         let match = items.find((i) => String(i.value) === queryName);
         if (!match) {
             match = { value: queryName, displayName: displayName || queryName };
-            dropdown.items = [...items.filter((i) => String(i.value) !== ""), match];
-            if (!dropdown.items.find((i) => String(i.value) === "")) {
-                dropdown.items = [NONE_ICON, ...dropdown.items];
+            dropdownCtrl.items = [...items.filter((i) => String(i.value) !== ""), match];
+            if (!dropdownCtrl.items.find((i) => String(i.value) === "")) {
+                dropdownCtrl.items = [NONE_ICON, ...dropdownCtrl.items];
             }
         }
-        dropdown.value = match;
+        dropdownCtrl.value = match;
     }
 
     public syncIconMeasureOptions(
@@ -579,26 +637,28 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             NONE_ICON,
             ...options.map((o) => ({ value: o.queryName, displayName: o.displayName })),
         ];
-        this.categoryImages.iconMeasure.items = items;
+        this.categoryImages.categoryIconMeasure.items = items;
         this.grandTotal.iconMeasure.items = items;
 
-        const catSelected = String(this.categoryImages.iconMeasure.value?.value ?? "").trim();
-        this.categoryImages.iconMeasure.value =
-            items.find((i) => String(i.value) === catSelected) ??
-            (options[0] ? { value: options[0].queryName, displayName: options[0].displayName } : NONE_ICON);
+        const catSelected = String(this.categoryImages.categoryIconMeasure.value?.value ?? "").trim();
+        this.categoryImages.categoryIconMeasure.value =
+            items.find((i) => String(i.value) === catSelected) ?? NONE_ICON;
 
         const gtSelected = String(this.grandTotal.iconMeasure.value?.value ?? "").trim();
         this.grandTotal.iconMeasure.value =
-            items.find((i) => String(i.value) === gtSelected) ??
-            (options[0] ? { value: options[0].queryName, displayName: options[0].displayName } : NONE_ICON);
+            items.find((i) => String(i.value) === gtSelected) ?? NONE_ICON;
     }
 
     public getSelectedCategoryName(): string {
         return String(this.categoryImages.selectedCategory.value?.value ?? "").trim();
     }
 
-    public getCategoryIconQueryName(): string {
-        return String(this.categoryImages.iconMeasure.value?.value ?? "").trim();
+    public getCategoryEditorDisplayMode(): DisplayMode {
+        return asDisplayMode(this.categoryImages.categoryDisplayMode.value, "text");
+    }
+
+    public getCategoryEditorIconQueryName(): string {
+        return String(this.categoryImages.categoryIconMeasure.value?.value ?? "").trim();
     }
 
     public getGrandTotalIconQueryName(): string {
@@ -620,7 +680,7 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         );
     }
 
-    /** Payload legado de imagem por categoria (títulos). Imagens vêm das medidas SVG. */
+    /** Payload legado de imagem por categoria. */
     public getEditorImagePayload(): { imageUrl: string; imageName: string } {
         const selected = this.getSelectedCategoryName();
         const fromMap = selected
@@ -629,27 +689,31 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         return { imageUrl: fromMap, imageName: fromMap ? "image" : "" };
     }
 
-    /** Mescla título da categoria selecionada no mapa persistente. */
+    /** Mescla editor da categoria selecionada no mapa persistente (só essa chave). */
     public buildSyncedCategoriesJson(): string {
         const selected = this.getSelectedCategoryName();
         let map = this.getCategoryMetaMap();
         if (selected) {
             map = upsertCategoryMeta(map, selected, {
                 title: this.categoryImages.categoryTitle.value || "",
+                displayMode: this.getCategoryEditorDisplayMode(),
+                iconQueryName: this.getCategoryEditorIconQueryName(),
             });
         }
         return serializeCategoryMetaMap(map);
     }
 
     public syncCategoryEditorFromMap(categoryNames: string[], preferredSelected?: string): void {
+        const map = this.getCategoryMetaMap();
+        const mergedNames = mergeCategoryNames(categoryNames, map, preferredSelected);
         const items = [
             PLACEHOLDER_CATEGORY,
-            ...categoryNames.map((name) => ({ value: name, displayName: name })),
+            ...mergedNames.map((name) => ({ value: name, displayName: name })),
         ];
         this.categoryImages.selectedCategory.items = items;
 
         const selected =
-            (preferredSelected && categoryNames.includes(preferredSelected)
+            (preferredSelected && mergedNames.some((n) => n === preferredSelected)
                 ? preferredSelected
                 : "") ||
             this.getSelectedCategoryName() ||
@@ -657,9 +721,20 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         const match = items.find((i) => i.value === selected) ?? PLACEHOLDER_CATEGORY;
         this.categoryImages.selectedCategory.value = match;
 
-        const map = this.getCategoryMetaMap();
         const meta = selected ? findCategoryMeta(map, selected) : undefined;
         this.categoryImages.categoryTitle.value = meta?.title || "";
+        const mode = meta?.displayMode || "text";
+        this.categoryImages.categoryDisplayMode.value =
+            DISPLAY_MODES.find((i) => i.value === mode) ?? DISPLAY_MODES[0];
+
+        const iconQn = meta?.iconQueryName || "";
+        if (iconQn) {
+            this.ensureIconMeasureItem(this.categoryImages.categoryIconMeasure, iconQn);
+        } else {
+            this.categoryImages.categoryIconMeasure.value = NONE_ICON;
+        }
+
+        this.categoryImages.applyVisibility();
     }
 
     /** Imagem do Total Geral (legado svgMarkup/url — preferir medida SVG). */
@@ -670,10 +745,6 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         return fromSvg || fromUpload || fromUrl;
     }
 
-    /**
-     * Diff de propriedades de imagem a persistir (evita loop de update).
-     * Compare com o último snapshot conhecido via `previous`.
-     */
     public collectImagePersistProperties(previous: {
         grandImageUrl?: string;
         grandSvg?: string;
@@ -713,36 +784,14 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         }
 
         const selected = this.getSelectedCategoryName();
-        const catType = this.getCategoryImageType();
         if (selected && selected !== (previous.selectedCategory || "")) {
             merge.push({
-                objectName: "categoryImages",
+                objectName: "categories",
                 selector: undefined,
                 properties: {
                     selectedCategory: selected,
                 },
             });
-        }
-        if (catType !== (previous.categoryType || "")) {
-            merge.push({
-                objectName: "categoryImages",
-                selector: undefined,
-                properties: {
-                    imageType: catType,
-                },
-            });
-        }
-        if (catType === "png") {
-            const payload = this.getEditorImagePayload();
-            if (payload.imageUrl && payload.imageUrl !== (previous.categoryImageUrl || "")) {
-                merge.push({
-                    objectName: "categoryImages",
-                    selector: undefined,
-                    properties: {
-                        imageUrl: payload.imageUrl,
-                    },
-                });
-            }
         }
 
         return { merge };
@@ -773,6 +822,8 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         const map = parseCategoryMetaMap(this.buildSyncedCategoriesJson());
         const images: Record<string, string> = {};
         const titles: Record<string, string> = {};
+        const displayModes: Record<string, DisplayMode> = {};
+        const iconQueryNames: Record<string, string> = {};
         for (const [key, meta] of Object.entries(map)) {
             if (meta.imageUrl) {
                 images[key] = meta.imageUrl;
@@ -780,10 +831,17 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             if (meta.title) {
                 titles[key] = meta.title;
             }
+            if (meta.displayMode) {
+                displayModes[key] = meta.displayMode;
+            }
+            if (meta.iconQueryName) {
+                iconQueryNames[key] = meta.iconQueryName;
+            }
         }
 
         const grandImage = this.getGrandTotalImagePayload();
         const label = (this.grandTotal.label.value || "").trim() || defaultStyle.grandTotalLabel;
+        const geral = this.categoriesGeral;
 
         return {
             fontFamily: this.general.fontFamily.value || defaultStyle.fontFamily,
@@ -796,20 +854,18 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             borderRadius: this.general.borderRadius.value,
             rowHeight: this.rows.rowHeight.value || this.general.rowHeight.value,
             rowGap: this.rows.rowGap.value || this.general.rowGap.value,
-            categoryWidth: this.categories.width.value,
-            categoryFontSize: this.categories.fontSize.value,
-            categoryFontColor: this.categories.fontColor.value.value,
-            categoryFontWeight: String(this.categories.fontWeight.value.value),
-            categoryAlignment: String(this.categories.alignment.value.value) as Align,
-            imageSize: this.categories.imageSize.value,
-            imagePlacement: String(this.categories.imagePlacement.value.value) as ImagePlacement,
+            categoryWidth: geral.width.value,
+            categoryFontSize: geral.fontSize.value,
+            categoryFontColor: geral.fontColor.value.value,
+            categoryFontWeight: String(geral.fontWeight.value.value),
+            categoryAlignment: String(geral.alignment.value.value) as Align,
+            imageSize: geral.imageSize.value,
+            imagePlacement: String(geral.imagePlacement.value.value) as ImagePlacement,
             categoryImageType: this.getCategoryImageType(),
-            categoryIconQueryName: this.getCategoryIconQueryName(),
-            sortMode: String(this.categories.sortMode.value.value) as SortMode,
-            sortKpiQueryName: this.categories.sortKpiQueryName.value || "",
+            sortMode: String(geral.sortMode.value.value) as SortMode,
             grandTotalShow: this.grandTotal.show.value,
             grandTotalLabel: label,
-            grandTotalDisplayMode: String(this.grandTotal.displayMode.value.value) as DisplayMode,
+            grandTotalDisplayMode: asDisplayMode(this.grandTotal.displayMode.value, "both"),
             grandTotalImageType: this.getGrandTotalImageType(),
             grandTotalIconQueryName: this.getGrandTotalIconQueryName(),
             grandTotalImageData: grandImage,
@@ -842,6 +898,13 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             valueBorderRight: this.values.borderRight.value,
             valueBorderTop: this.values.borderTop.value,
             valueBorderBottom: this.values.borderBottom.value,
+            valueVerticalBorderHeight: String(
+                this.values.verticalBorderHeight.value.value,
+            ) as VerticalBorderHeight,
+            valueVerticalBorderCustomHeight: Math.max(
+                1,
+                this.values.verticalBorderCustomHeight.value || 24,
+            ),
             valueBorderColor: this.values.borderColor.value.value,
             valueBorderWidth: this.values.borderWidth.value,
             valueBorderRadius: this.values.borderRadius.value,
@@ -852,6 +915,8 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             tooltipEnabled: this.tooltip.enabled.value,
             categoryImages: images,
             categoryTitles: titles,
+            categoryDisplayModes: displayModes,
+            categoryIconQueryNames: iconQueryNames,
         };
     }
 
@@ -860,17 +925,15 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         return {
             totalLabel: style.grandTotalLabel,
             sortMode: style.sortMode,
-            sortKpiQueryName: style.sortKpiQueryName,
             categoriesJson: this.buildSyncedCategoriesJson(),
             imagesJson: this.categoryImages.imagesJson.value || "{}",
             showTotal: style.grandTotalShow,
             displayUnits: style.valueDisplayUnits,
             precision: style.valuePrecision,
-            categoryIconQueryName: style.categoryIconQueryName,
             grandTotalIconQueryName: style.grandTotalIconQueryName,
+            grandTotalDisplayMode: style.grandTotalDisplayMode,
         };
     }
 }
 
-// re-export helpers used by tests / visual
 void metaFromImageValue;

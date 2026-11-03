@@ -96,9 +96,31 @@ function resolveGridTemplateColumns(view: VisualViewModel, style: ResolvedVisual
                 continue;
             }
             w = Math.max(w, estimateTextWidth(cell.primary.text, primarySize, 24));
-            for (const comp of cell.complements) {
-                w = Math.max(w, estimateTextWidth(comp.label, labelSize, 16));
-                w = Math.max(w, estimateTextWidth(comp.value.text, compSize, 16));
+            const comps = cell.complements.filter((c) => c.value.text || c.label);
+            if (!comps.length) {
+                continue;
+            }
+            const layout = resolveLayout(cell, col);
+            // Horizontal: cada complemento é uma fração da célula — a coluna
+            // precisa caber a soma das fatias (ex.: 2 × 80 = 160).
+            if (layout === "horizontal" && comps.length > 1) {
+                let sum = 0;
+                for (const comp of comps) {
+                    const slot = Math.max(
+                        estimateTextWidth(comp.label, labelSize, 8),
+                        estimateTextWidth(comp.value.text, compSize, 8),
+                        24,
+                    );
+                    sum += slot;
+                }
+                // gaps entre complementos (14px) + padding típico da célula
+                sum += 14 * (comps.length - 1) + (col.cellPadding || 0) * 2;
+                w = Math.max(w, sum);
+            } else {
+                for (const comp of comps) {
+                    w = Math.max(w, estimateTextWidth(comp.label, labelSize, 16));
+                    w = Math.max(w, estimateTextWidth(comp.value.text, compSize, 16));
+                }
             }
         }
         return Math.max(w, 48);
@@ -111,13 +133,28 @@ function resolveLayout(cell: KpiCellData, col: KpiColumnConfig): CellLayout {
     if (col.layout !== "auto") {
         return col.layout;
     }
-    if (cell.complements.length <= 1) {
-        return "vertical";
+    // Com 2+ complementos, divide a largura da célula em frações iguais.
+    return cell.complements.length >= 2 ? "horizontal" : "vertical";
+}
+
+/** Largura de cada complemento = fração da célula (ex.: 160px / 2 = 80px). */
+function complementSlotWidth(
+    cellWidthPx: number,
+    complementCount: number,
+    cellPadding: number,
+    layout: CellLayout,
+): number {
+    const pad = Math.max(0, cellPadding || 0);
+    const inner = Math.max(0, cellWidthPx - pad * 2);
+    if (complementCount <= 0) {
+        return inner;
     }
-    if (col.widthMode === "fixed" && col.columnWidth < 130) {
-        return "vertical";
+    if (layout !== "horizontal" || complementCount === 1) {
+        return inner;
     }
-    return cell.complements.length >= 3 ? "horizontal" : "vertical";
+    const gap = 14;
+    const gaps = gap * (complementCount - 1);
+    return Math.max(12, Math.floor((inner - gaps) / complementCount));
 }
 
 function parseSvgIntrinsicSize(svgHtml: string): { w: number; h: number } | undefined {
@@ -236,6 +273,28 @@ function pickCategoryImageSource(
     return "";
 }
 
+function resolveCategoryDisplayMode(
+    row: MatrixRow,
+    style: ResolvedVisualStyle,
+    isTotal: boolean,
+): "text" | "image" | "both" {
+    if (isTotal) {
+        return style.grandTotalDisplayMode || row.displayMode || "both";
+    }
+    const fromStyle = style.categoryDisplayModes?.[row.category];
+    if (fromStyle) {
+        return fromStyle;
+    }
+    const needle = row.category.trim().toLowerCase();
+    const key = Object.keys(style.categoryDisplayModes || {}).find(
+        (k) => k.trim().toLowerCase() === needle,
+    );
+    if (key) {
+        return style.categoryDisplayModes[key];
+    }
+    return row.displayMode || "text";
+}
+
 function categoryCellHtml(
     row: MatrixRow,
     style: ResolvedVisualStyle,
@@ -244,8 +303,8 @@ function categoryCellHtml(
 ): string {
     const iconSource = pickCategoryImageSource(row, style, isTotal);
     const preferredSize = isTotal ? style.grandTotalImageSize : style.imageSize;
-    const mode = isTotal ? style.grandTotalDisplayMode || "both" : "both";
-    const fillCell = isTotal && mode === "image";
+    const mode = resolveCategoryDisplayMode(row, style, isTotal);
+    const fillCell = mode === "image";
     const icon = imageHtml(iconSource, preferredSize, "dkm-icon", categoryColWidth, fillCell);
 
     const label = isTotal
@@ -254,7 +313,8 @@ function categoryCellHtml(
 
     const showText = mode === "text" || mode === "both";
     const showImage = (mode === "image" || mode === "both") && Boolean(icon);
-    const place = style.imagePlacement;
+    // Texto e imagem: SVG à esquerda do texto (placement "above" só quando ambos).
+    const place = mode === "both" ? style.imagePlacement : "left";
     const tip = !isTotal && style.tooltipEnabled ? tipAttr(label, row) : "";
     const tipClass = tip ? " dkm-tip" : "";
     const fillClass = fillCell && showImage && !showText ? " dkm-cat-image-only" : "";
@@ -333,21 +393,38 @@ function kpiCellHtml(
     const bw = Math.max(0, style.valueBorderWidth || 0);
     const bc = style.valueBorderColor || "#D0D0D0";
     const br = Math.max(0, style.valueBorderRadius || 0);
-    const borderCss =
+    const hasLeft = Boolean(style.valueBorderLeft);
+    const hasRight = Boolean(style.valueBorderRight);
+    const hasTop = Boolean(style.valueBorderTop);
+    const hasBottom = Boolean(style.valueBorderBottom);
+    const vHeightMode = style.valueVerticalBorderHeight || "full";
+    // Bordas L/R "completas" no container; content/custom usam outro mecanismo.
+    const verticalOnShell = vHeightMode === "full";
+    const outerBorderCss =
         `border-style:solid;` +
         `border-color:${bc};` +
-        `border-left-width:${style.valueBorderLeft ? bw : 0}px;` +
-        `border-right-width:${style.valueBorderRight ? bw : 0}px;` +
-        `border-top-width:${style.valueBorderTop ? bw : 0}px;` +
-        `border-bottom-width:${style.valueBorderBottom ? bw : 0}px;` +
+        `border-left-width:${verticalOnShell && hasLeft ? bw : 0}px;` +
+        `border-right-width:${verticalOnShell && hasRight ? bw : 0}px;` +
+        `border-top-width:${hasTop ? bw : 0}px;` +
+        `border-bottom-width:${hasBottom ? bw : 0}px;` +
+        `border-radius:${br}px;`;
+    const frameBorderCss =
+        `border-style:solid;` +
+        `border-color:${bc};` +
+        `border-left-width:${hasLeft ? bw : 0}px;` +
+        `border-right-width:${hasRight ? bw : 0}px;` +
+        `border-top-width:0;` +
+        `border-bottom-width:0;` +
         `border-radius:${br}px;`;
 
-    // Em layout horizontal, cada complemento divide a largura da célula.
+    // Cada complemento ocupa uma fração da largura do indicador
+    // (ex.: célula 160px com 2 complementos → 80px cada).
     const visibleComps = cell.complements.filter((c) => c.value.text || c.label);
-    const slotWidth =
+    const slotWidth = complementSlotWidth(cellWidthPx, visibleComps.length, pad, layout);
+    const slotCss =
         layout === "horizontal" && visibleComps.length > 1
-            ? Math.floor(cellWidthPx / visibleComps.length)
-            : cellWidthPx;
+            ? `flex:0 0 ${slotWidth}px;width:${slotWidth}px;max-width:${slotWidth}px;`
+            : `width:100%;max-width:100%;`;
 
     const comps = visibleComps
         .map((c) => {
@@ -367,7 +444,7 @@ function kpiCellHtml(
             const labelSize = fitLabelFontSize(c.label || c.displayName, baseLabelSize, slotWidth);
             const valueSize = fitLabelFontSize(c.value.text || "", compSize, slotWidth);
             return (
-                `<div class="dkm-comp" style="${back}max-width:100%">` +
+                `<div class="dkm-comp" style="${back}${slotCss}">` +
                 `<span class="dkm-comp-label" style="font-size:${labelSize}px;color:${labelColor}">${esc(c.label || c.displayName)}</span>` +
                 `<span class="dkm-comp-value-wrap">` +
                 bar +
@@ -381,10 +458,40 @@ function kpiCellHtml(
         ? `<div class="dkm-primary" style="font-size:${primarySize}px;color:${primaryColor};font-weight:${style.fontWeight === "400" ? "700" : style.fontWeight}">${esc(cell.primary.text)}</div>`
         : `<div class="dkm-primary dkm-blank">—</div>`;
 
+    const bodyHtml = primary + (comps ? `<div class="dkm-comps">${comps}</div>` : "");
+    const alignItems =
+        align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
+    const shellBase =
+        `background:${bg};padding:${pad}px;text-align:${align};` +
+        `align-items:${alignItems};${outerBorderCss}`;
+
+    // Personalizada: barras absolutas centralizadas (não afetam layout do valor).
+    let customBars = "";
+    if (vHeightMode === "custom" && (hasLeft || hasRight) && bw > 0) {
+        const h = Math.max(1, style.valueVerticalBorderCustomHeight || 24);
+        const barStyle = `height:${h}px;width:${bw}px;background:${bc};`;
+        if (hasLeft) {
+            customBars += `<span class="dkm-vborder dkm-vborder-l" style="${barStyle}" aria-hidden="true"></span>`;
+        }
+        if (hasRight) {
+            customBars += `<span class="dkm-vborder dkm-vborder-r" style="${barStyle}" aria-hidden="true"></span>`;
+        }
+    }
+
+    // Somente área do valor: frame interno com L/R, altura = conteúdo, centralizado na célula.
+    if (vHeightMode === "content" && (hasLeft || hasRight)) {
+        return (
+            `<div class="dkm-kpi dkm-kpi-vcontent dkm-layout-${layout}" style="${shellBase}">` +
+            `<div class="dkm-kpi-frame" style="${frameBorderCss}align-items:${alignItems}">` +
+            bodyHtml +
+            `</div></div>`
+        );
+    }
+
     return (
-        `<div class="dkm-kpi dkm-layout-${layout}" style="background:${bg};padding:${pad}px;text-align:${align};align-items:${align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start"};${borderCss}">` +
-        primary +
-        (comps ? `<div class="dkm-comps">${comps}</div>` : "") +
+        `<div class="dkm-kpi dkm-layout-${layout}" style="position:relative;${shellBase}">` +
+        customBars +
+        bodyHtml +
         `</div>`
     );
 }

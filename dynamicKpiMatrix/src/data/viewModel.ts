@@ -4,9 +4,11 @@ export type CellLayout = "auto" | "vertical" | "horizontal";
 export type WidthMode = "auto" | "fixed";
 export type Align = "left" | "center" | "right";
 export type ImagePlacement = "left" | "above";
-export type SortMode = "data" | "alphaAsc" | "alphaDesc" | "kpiAsc" | "kpiDesc";
+export type SortMode = "data" | "alphaAsc" | "alphaDesc";
 export type DisplayMode = "text" | "image" | "both";
 export type ImageSourceType = "png" | "svg";
+/** Altura das bordas esquerda/direita na seção Valores. */
+export type VerticalBorderHeight = "full" | "content" | "custom";
 export type CfApplyTo = "value" | "background" | "both";
 export type ComplementIconSet = "none" | "directional" | "traffic" | "triangles";
 export type CellElementKind = "font" | "background" | "dataBars" | "icons" | "webUrl";
@@ -105,6 +107,8 @@ export interface MatrixRow {
     categoryKey: string;
     /** Título exibido (customizado ou nome da categoria). */
     displayTitle: string;
+    /** Modo de exibição da célula de categoria (linhas; total usa estilo global). */
+    displayMode: DisplayMode;
     iconRaw: string;
     iconPersisted?: string;
     isTotal: boolean;
@@ -118,7 +122,7 @@ export interface VisualViewModel {
     rows: MatrixRow[];
     totalRow?: MatrixRow;
     complementOptions: Array<{ queryName: string; displayName: string }>;
-    /** Medidas do well Ícone da categoria (SVG). */
+    /** Medidas do well SVG (categoryIcon). */
     iconMeasureOptions: Array<{ queryName: string; displayName: string }>;
     categoryNames: string[];
     emptyMessage?: string;
@@ -143,10 +147,7 @@ export interface ResolvedVisualStyle {
     imageSize: number;
     imagePlacement: ImagePlacement;
     categoryImageType: ImageSourceType;
-    /** queryName da medida SVG usada nas linhas de categoria. */
-    categoryIconQueryName: string;
     sortMode: SortMode;
-    sortKpiQueryName: string;
     grandTotalShow: boolean;
     grandTotalLabel: string;
     grandTotalDisplayMode: DisplayMode;
@@ -183,6 +184,9 @@ export interface ResolvedVisualStyle {
     valueBorderRight: boolean;
     valueBorderTop: boolean;
     valueBorderBottom: boolean;
+    /** Completa | Somente área do valor | Personalizada — só L/R. */
+    valueVerticalBorderHeight: VerticalBorderHeight;
+    valueVerticalBorderCustomHeight: number;
     valueBorderColor: string;
     valueBorderWidth: number;
     valueBorderRadius: number;
@@ -191,8 +195,11 @@ export interface ResolvedVisualStyle {
     headerBackground: string;
     headerFontWeight: string;
     tooltipEnabled: boolean;
+    /** Legado: data URI por categoria. */
     categoryImages: Record<string, string>;
     categoryTitles: Record<string, string>;
+    categoryDisplayModes: Record<string, DisplayMode>;
+    categoryIconQueryNames: Record<string, string>;
 }
 
 export const defaultStyle: ResolvedVisualStyle = {
@@ -214,9 +221,7 @@ export const defaultStyle: ResolvedVisualStyle = {
     imageSize: 22,
     imagePlacement: "left",
     categoryImageType: "svg",
-    categoryIconQueryName: "",
     sortMode: "data",
-    sortKpiQueryName: "",
     grandTotalShow: true,
     grandTotalLabel: "Total Geral",
     grandTotalDisplayMode: "both",
@@ -252,6 +257,8 @@ export const defaultStyle: ResolvedVisualStyle = {
     valueBorderRight: false,
     valueBorderTop: false,
     valueBorderBottom: false,
+    valueVerticalBorderHeight: "full",
+    valueVerticalBorderCustomHeight: 24,
     valueBorderColor: "#D0D0D0",
     valueBorderWidth: 1,
     valueBorderRadius: 0,
@@ -262,6 +269,8 @@ export const defaultStyle: ResolvedVisualStyle = {
     tooltipEnabled: true,
     categoryImages: {},
     categoryTitles: {},
+    categoryDisplayModes: {},
+    categoryIconQueryNames: {},
 };
 
 export const defaultKpiStyle = {

@@ -6,11 +6,11 @@ O Power BI Visuals SDK **não** oferece dataRoles aninhados/dinâmicos no painel
 
 **Alternativa implementada:** wells flat (`kpis` + `complements`) + mapeamento persistente por `queryName` (objects `kpiStyle` com seletor de metadata e/ou `kpiMapping.mappingJson`).
 
-## 2. Upload de imagens PNG/SVG
+## 2. Imagens SVG
 
-Não existe tipo `image` documentado em `capabilities.json`. O componente `ImageUpload` da Formatting Model API existe, mas a comunidade reporta falha de persistência sem tipo correspondente.
+Não há well de dados dentro do painel **Formatar** — apenas no painel **Dados**.
 
-**Alternativa implementada:** persistência em propriedade `text` (data URI ou SVG) + well opcional `categoryIcon` (medida). SVGs são sanitizados (script, eventos, URLs externas removidos). Limite prático ~24 KB por imagem nos objects do visual.
+**Alternativa implementada:** well Measure `categoryIcon` (displayName **SVG**) + seleção por `queryName` no Formatar (Total Geral e por categoria). O valor é lido no nó da matrix (contexto de filtro da linha ou do total). SVGs são sanitizados (script, eventos, URLs externas removidos). Upload PNG legado não faz parte do fluxo ativo.
 
 ## 3. Formatação condicional
 

@@ -185,7 +185,6 @@ function assert(condition: unknown, message: string): asserts condition {
     const view = convertDataView(dataView, {
         totalLabel: "Total Geral",
         sortMode: "alphaAsc",
-        sortKpiQueryName: "",
         categoriesJson: "{}",
         imagesJson: "{}",
         showTotal: true,
@@ -195,6 +194,7 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(view.columns[0].complements.length === 1, "complement associated");
     assert(view.rows.length === 2, "two categories");
     assert(view.rows[0].category === "Produto A", "alpha sort");
+    assert(view.rows[0].displayMode === "text", "default category display mode");
     assert(view.totalRow, "total row from matrix subtotal");
     assert(view.totalRow!.isTotal, "total flagged");
     assert(view.totalRow!.displayTitle === "Total Geral", "total title");
@@ -233,7 +233,6 @@ function assert(condition: unknown, message: string): asserts condition {
     const view = convertDataView(dataView, {
         totalLabel: "Total Geral",
         sortMode: "data",
-        sortKpiQueryName: "",
         categoriesJson: "{}",
         showTotal: true,
     });
@@ -262,13 +261,120 @@ function assert(condition: unknown, message: string): asserts condition {
     const view = convertDataView(dataView, {
         totalLabel: "Total",
         sortMode: "data",
-        sortKpiQueryName: "",
         categoriesJson: "{}",
         showTotal: true,
     });
     assert(view.totalRow!.cells[0].primary.raw === 0.99, "uses matrix subtotal, not mean of 1.1 and 0.8");
     const mean = (1.1 + 0.8) / 2;
     assert(view.totalRow!.cells[0].primary.raw !== mean, "explicitly not arithmetic mean");
+}
+
+// Per-category SVG measure + custom title (identity preserved)
+{
+    const svgA = "<svg id='a'><circle r='1'/></svg>";
+    const svgB = "<svg id='b'><rect width='1' height='1'/></svg>";
+    const svgTotal = "<svg id='t'><path d='M0 0'/></svg>";
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    children: [
+                        {
+                            isSubtotal: true,
+                            values: {
+                                0: { value: 100 },
+                                1: { value: svgTotal },
+                                2: { value: svgA },
+                                3: { value: svgB },
+                            },
+                        },
+                        {
+                            value: "Surgery",
+                            values: {
+                                0: { value: 40 },
+                                1: { value: svgTotal },
+                                2: { value: svgA },
+                                3: { value: svgB },
+                            },
+                        },
+                        {
+                            value: "Orthopaedics",
+                            values: {
+                                0: { value: 60 },
+                                1: { value: svgTotal },
+                                2: { value: svgA },
+                                3: { value: svgB },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Billing", roles: { kpis: true } },
+                { queryName: "svgTotal", displayName: "SVG Total", roles: { categoryIcon: true } },
+                { queryName: "svgSurgery", displayName: "SVG Surgery", roles: { categoryIcon: true } },
+                { queryName: "svgOrtho", displayName: "SVG Ortho", roles: { categoryIcon: true } },
+            ],
+        },
+        metadata: {
+            columns: [
+                { queryName: "kpiA", roles: { kpis: true } },
+                { queryName: "svgTotal", roles: { categoryIcon: true } },
+                { queryName: "svgSurgery", roles: { categoryIcon: true } },
+                { queryName: "svgOrtho", roles: { categoryIcon: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const categoriesJson = JSON.stringify({
+        Surgery: {
+            title: "Cirurgia",
+            displayMode: "both",
+            iconQueryName: "svgSurgery",
+        },
+        Orthopaedics: {
+            displayMode: "image",
+            iconQueryName: "svgOrtho",
+        },
+        HiddenCat: {
+            title: "Fora do filtro",
+            displayMode: "text",
+        },
+    });
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total LATAM",
+        sortMode: "data",
+        categoriesJson,
+        showTotal: true,
+        grandTotalIconQueryName: "svgTotal",
+        grandTotalDisplayMode: "both",
+    });
+
+    assert(view.rows.length === 2, "two visible categories");
+    const surgery = view.rows.find((r) => r.category === "Surgery");
+    const ortho = view.rows.find((r) => r.category === "Orthopaedics");
+    assert(surgery, "surgery row");
+    assert(surgery!.displayTitle === "Cirurgia", "custom title");
+    assert(surgery!.category === "Surgery", "identity preserved");
+    assert(surgery!.displayMode === "both", "surgery mode");
+    assert(surgery!.iconRaw.includes("id='a'"), "surgery svg measure");
+    assert(ortho!.displayMode === "image", "ortho mode");
+    assert(ortho!.iconRaw.includes("id='b'"), "ortho svg measure");
+    assert(view.totalRow!.iconRaw.includes("id='t'"), "total svg measure");
+    assert(view.totalRow!.displayMode === "both", "total display mode");
+    assert(view.totalRow!.displayTitle === "Total LATAM", "total label");
+    assert(view.iconMeasureOptions.length === 3, "three svg measures in well");
+
+    // Sem seleção de medida: sem ícone genérico
+    const noIcon = convertDataView(dataView, {
+        totalLabel: "Total",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: true,
+    });
+    assert(!noIcon.rows[0].iconRaw, "no generic icon fallback");
+    assert(!noIcon.totalRow!.iconRaw, "no total icon without selection");
 }
 
 // --- renderer ---
@@ -305,6 +411,7 @@ function assert(condition: unknown, message: string): asserts condition {
                     category: "Produto A",
                     categoryKey: "Produto A",
                     displayTitle: "Produto A",
+                    displayMode: "text",
                     iconRaw: "",
                     isTotal: false,
                     sourceIndex: 0,
@@ -331,6 +438,7 @@ function assert(condition: unknown, message: string): asserts condition {
                 category: "Total Geral",
                 categoryKey: "Total Geral",
                 displayTitle: "Total Geral",
+                displayMode: "text",
                 iconRaw: "",
                 isTotal: true,
                 sourceIndex: -1,
@@ -358,7 +466,7 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(html.includes("110.00%"), "complement value");
 }
 
-// category meta title override
+// category meta title override + independent display/svg
 {
     let map = parseCategoryMetaMap('{"A":{"title":"Alpha","imageUrl":"data:image/png;base64,xx"}}');
     assert(map.A.title === "Alpha", "title parsed");
@@ -368,6 +476,21 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(Boolean(map.A.imageUrl), "empty imageUrl does not wipe without clearImage");
     map = upsertCategoryMeta(map, "A", { title: "" });
     assert(!map.A?.title, "title cleared");
+
+    map = upsertCategoryMeta(map, "Surgery", {
+        title: "Cirurgia",
+        displayMode: "both",
+        iconQueryName: "svgSurgery",
+    });
+    map = upsertCategoryMeta(map, "Orthopaedics", {
+        displayMode: "image",
+        iconQueryName: "svgOrtho",
+    });
+    assert(map.Surgery.displayMode === "both", "surgery mode stored");
+    assert(map.Orthopaedics.iconQueryName === "svgOrtho", "ortho svg stored");
+    map = upsertCategoryMeta(map, "Surgery", { title: "Cirurgia LATAM" });
+    assert(map.Orthopaedics.iconQueryName === "svgOrtho", "editing surgery does not touch ortho");
+    assert(map.Surgery.title === "Cirurgia LATAM", "surgery title updated");
 }
 
 console.log("All Dynamic KPI Matrix tests passed.");
