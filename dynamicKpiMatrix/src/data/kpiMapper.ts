@@ -85,25 +85,45 @@ export function collectMeasures(valueSources: powerbi.DataViewMetadataColumn[] |
     return result;
 }
 
+const NONE_COMPLEMENT = "__none__";
+
+function normalizeComplementQueryName(raw: string): string {
+    const q = raw.trim();
+    if (!q || q === NONE_COMPLEMENT) {
+        return "";
+    }
+    return q;
+}
+
 function complementSlots(
     styleObjects: DataViewObjects | undefined,
     mappingEntry: { complements?: string[] } | undefined,
     complements: MeasureRef[],
 ): ComplementSlot[] {
     const byQuery = new Map(complements.map((c) => [c.queryName, c]));
+    const kpiStyle = styleObjects?.kpiStyle as Record<string, unknown> | undefined;
+    // Se o KPI já tem kpiStyle (mesmo com complementos vazios), não voltar ao JSON antigo.
+    const hasExplicitKpiStyle = Boolean(kpiStyle);
+
     const fromObjects = [1, 2, 3, 4]
         .map((i) => {
-            const q = asText(readProp(styleObjects, "kpiStyle", `complement${i}`));
+            const q = normalizeComplementQueryName(
+                asText(readProp(styleObjects, "kpiStyle", `complement${i}`)),
+            );
             const label = asText(readProp(styleObjects, "kpiStyle", `complement${i}Label`));
             return { queryName: q, label };
         })
         .filter((slot) => slot.queryName);
 
     const fromJson = (mappingEntry?.complements ?? [])
+        .map((queryName) => normalizeComplementQueryName(queryName))
         .filter(Boolean)
         .map((queryName) => ({ queryName, label: "" }));
 
-    const combined = (fromObjects.length ? fromObjects : fromJson).slice(0, 4);
+    const combined = (hasExplicitKpiStyle ? fromObjects : fromObjects.length ? fromObjects : fromJson).slice(
+        0,
+        4,
+    );
     const seen = new Set<string>();
     const slots: ComplementSlot[] = [];
     for (const item of combined) {
@@ -121,6 +141,8 @@ function complementSlots(
     }
     return slots;
 }
+
+export { NONE_COMPLEMENT };
 
 export function buildKpiColumns(
     measures: MeasureRef[],

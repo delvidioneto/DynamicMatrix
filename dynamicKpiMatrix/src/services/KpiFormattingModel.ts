@@ -2,11 +2,12 @@
 
 import powerbi from "powerbi-visuals-api";
 import type { KpiColumnConfig } from "../data/viewModel";
+import { NONE_COMPLEMENT } from "../data/kpiMapper";
 
 const LAYOUT_ITEMS: powerbi.IEnumMember[] = [
-    { value: "auto", displayName: "Automático" },
     { value: "vertical", displayName: "Vertical" },
     { value: "horizontal", displayName: "Horizontal" },
+    { value: "auto", displayName: "Automático" },
 ];
 
 function textSlice(
@@ -66,7 +67,11 @@ function dropdownSlice(
     items: powerbi.IEnumMember[],
     queryName: string,
 ): powerbi.visuals.FormattingSlice {
-    const selected = items.find((i) => String(i.value) === String(value)) ?? items[0];
+    const normalized = !value || value === NONE_COMPLEMENT ? NONE_COMPLEMENT : value;
+    const selected =
+        items.find((i) => String(i.value) === String(normalized)) ??
+        items.find((i) => String(i.value) === NONE_COMPLEMENT) ??
+        items[0];
     return {
         uid,
         displayName,
@@ -142,24 +147,36 @@ export function buildKpiContainerCard(
     }
 
     const complementItems: powerbi.IEnumMember[] = [
-        { value: "", displayName: "(nenhum)" },
+        { value: NONE_COMPLEMENT, displayName: "(nenhum)" },
         ...complementOptions.map((c) => ({ value: c.queryName, displayName: c.displayName })),
     ];
 
     const containerItems: powerbi.visuals.FormattingContainerItem[] = columns.map((col, index) => {
         const q = col.queryName;
         const comps = col.complements;
+        const layoutValue =
+            col.layout === "horizontal" || col.layout === "vertical" || col.layout === "auto"
+                ? col.layout
+                : "vertical";
+
         return {
             displayName: col.title || col.displayName,
             uid: `kpi_item_${index}_uid`,
             slices: [
                 textSlice(`kpi_${index}_title`, "Título exibido", "title", col.title, q),
-                dropdownSlice(`kpi_${index}_layout`, "Layout", "layout", col.layout, LAYOUT_ITEMS, q),
+                dropdownSlice(
+                    `kpi_${index}_layout`,
+                    "Orientação dos complementos",
+                    "layout",
+                    layoutValue,
+                    LAYOUT_ITEMS,
+                    q,
+                ),
                 dropdownSlice(
                     `kpi_${index}_c1`,
                     "Complemento 1",
                     "complement1",
-                    comps[0]?.queryName ?? "",
+                    comps[0]?.queryName ?? NONE_COMPLEMENT,
                     complementItems,
                     q,
                 ),
@@ -168,7 +185,7 @@ export function buildKpiContainerCard(
                     `kpi_${index}_c2`,
                     "Complemento 2",
                     "complement2",
-                    comps[1]?.queryName ?? "",
+                    comps[1]?.queryName ?? NONE_COMPLEMENT,
                     complementItems,
                     q,
                 ),
@@ -177,7 +194,7 @@ export function buildKpiContainerCard(
                     `kpi_${index}_c3`,
                     "Complemento 3",
                     "complement3",
-                    comps[2]?.queryName ?? "",
+                    comps[2]?.queryName ?? NONE_COMPLEMENT,
                     complementItems,
                     q,
                 ),
@@ -186,14 +203,12 @@ export function buildKpiContainerCard(
                     `kpi_${index}_c4`,
                     "Complemento 4",
                     "complement4",
-                    comps[3]?.queryName ?? "",
+                    comps[3]?.queryName ?? NONE_COMPLEMENT,
                     complementItems,
                     q,
                 ),
                 textSlice(`kpi_${index}_c4l`, "Rótulo 4", "complement4Label", comps[3]?.label ?? "", q),
                 numSlice(`kpi_${index}_width`, "Largura (px)", "columnWidth", col.columnWidth, q),
-                numSlice(`kpi_${index}_min`, "Largura mínima", "minWidth", col.minWidth, q),
-                numSlice(`kpi_${index}_max`, "Largura máxima", "maxWidth", col.maxWidth, q),
                 numSlice(
                     `kpi_${index}_ps`,
                     "Fonte principal",

@@ -26,7 +26,7 @@ function esc(text: string): string {
 
 function tipAttr(header: string, row: MatrixRow): string {
     const lines = [
-        { displayName: "Categoria", value: row.category },
+        { displayName: "Categoria", value: row.displayTitle || row.category },
         ...row.tooltips,
     ].filter((l) => l.value);
     if (!lines.length) {
@@ -52,11 +52,14 @@ export function parseCellTooltip(raw: string | undefined): TooltipPayloadItem[] 
     }
 }
 
-function columnWidthCss(col: KpiColumnConfig): string {
+function columnWidthCss(col: KpiColumnConfig, style: ResolvedVisualStyle): string {
     if (col.widthMode === "fixed") {
         return `${col.columnWidth}px`;
     }
-    return `minmax(${col.minWidth}px, ${col.maxWidth}px)`;
+    const base = style.columnWidth || col.columnWidth || 140;
+    const min = Math.min(col.minWidth || 96, base);
+    const max = Math.max(col.maxWidth || base, base);
+    return `${Math.min(Math.max(base, min), max)}px`;
 }
 
 function resolveLayout(cell: KpiCellData, col: KpiColumnConfig): CellLayout {
@@ -84,13 +87,20 @@ function imageHtml(raw: string | undefined, size: number, className: string): st
 }
 
 function categoryCellHtml(row: MatrixRow, style: ResolvedVisualStyle, isTotal: boolean): string {
+    const iconSource = isTotal
+        ? style.grandTotalImageData || row.iconPersisted || row.iconRaw
+        : row.iconPersisted || row.iconRaw;
     const icon = imageHtml(
-        row.iconPersisted || row.iconRaw || (isTotal ? style.grandTotalImageData : ""),
+        iconSource,
         isTotal ? style.grandTotalImageSize : style.imageSize,
         "dkm-icon",
     );
-    const label = isTotal ? style.grandTotalLabel || row.category : row.category;
-    const mode = isTotal ? style.grandTotalDisplayMode : "both";
+
+    const label = isTotal
+        ? style.grandTotalLabel || row.displayTitle || "Total Geral"
+        : row.displayTitle || row.category;
+
+    const mode = isTotal ? style.grandTotalDisplayMode || "both" : "both";
     const showText = mode === "text" || mode === "both";
     const showImage = (mode === "image" || mode === "both") && Boolean(icon);
     const place = style.imagePlacement;
@@ -98,10 +108,7 @@ function categoryCellHtml(row: MatrixRow, style: ResolvedVisualStyle, isTotal: b
     const tipClass = tip ? " dkm-tip" : "";
 
     const textHtml = showText ? `<span class="dkm-cat-text">${esc(label)}</span>` : "";
-    const inner =
-        place === "above"
-            ? `${showImage ? icon : ""}${textHtml}`
-            : `${showImage ? icon : ""}${textHtml}`;
+    const inner = `${showImage ? icon : ""}${textHtml}`;
 
     return `<div class="dkm-cat${tipClass}${place === "above" ? " dkm-cat-above" : ""}"${tip}>${inner}</div>`;
 }
@@ -145,7 +152,7 @@ function rowBackground(style: ResolvedVisualStyle, index: number, isTotal: boole
         return style.grandTotalBackground;
     }
     if (!style.zebra) {
-        return style.rowDefaultBackground;
+        return style.rowDefaultBackground || style.columnBackground;
     }
     return index % 2 === 0 ? style.rowEvenBackground : style.rowOddBackground;
 }
@@ -163,6 +170,8 @@ function renderRow(
     const fontColor = isTotal ? style.grandTotalFontColor : style.categoryFontColor;
     const fontWeight = isTotal ? "700" : style.categoryFontWeight;
     const align = isTotal ? style.grandTotalAlignment : style.categoryAlignment;
+    const rowRadius = style.rowBorderRadius;
+    const colRadius = style.columnBorderRadius;
 
     const cells = columns
         .map((col, i) => {
@@ -172,12 +181,17 @@ function renderRow(
                 complements: [],
                 layout: col.layout,
             };
-            return `<div class="dkm-cell dkm-kpi-cell">${kpiCellHtml(cell, col, style)}</div>`;
+            const isLast = i === columns.length - 1;
+            return (
+                `<div class="dkm-cell dkm-kpi-cell${isLast ? " dkm-cell-last" : ""}">` +
+                kpiCellHtml(cell, col, style) +
+                `</div>`
+            );
         })
         .join("");
 
     return (
-        `<div class="dkm-row${isTotal ? " dkm-row-total" : ""}" style="--row-bg:${bg};min-height:${height}px;border-color:${style.rowBorderColor};border-width:${style.rowBorderWidth}px;border-radius:${style.rowBorderRadius}px;margin-bottom:${style.rowGap}px">` +
+        `<div class="dkm-row${isTotal ? " dkm-row-total" : ""}" style="--row-bg:${bg};--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${rowRadius}px;--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${colRadius}px;--col-gap:${style.columnGap}px;min-height:${height}px;margin-bottom:${style.rowGap}px">` +
         `<div class="dkm-cell dkm-cat-cell" style="font-size:${fontSize}px;color:${fontColor};font-weight:${fontWeight};text-align:${align}">${categoryCellHtml(row, style, isTotal)}</div>` +
         cells +
         `</div>`
@@ -206,7 +220,7 @@ export function buildMatrixHtml(view: VisualViewModel, style: ResolvedVisualStyl
 
     const templateColumns = [
         `${style.categoryWidth}px`,
-        ...view.columns.map(columnWidthCss),
+        ...view.columns.map((col) => columnWidthCss(col, style)),
     ].join(" ");
 
     const bodyRows = view.rows.map((row, i) => renderRow(row, view.columns, style, i)).join("");
@@ -215,12 +229,16 @@ export function buildMatrixHtml(view: VisualViewModel, style: ResolvedVisualStyl
             ? renderRow(view.totalRow, view.columns, style, -1)
             : "";
 
+    // Cabeçalho + Total Geral ficam em bloco sticky no topo (sempre visíveis).
     return (
-        `<div class="dkm-root" style="font-family:${esc(style.fontFamily)},Segoe UI,Arial,sans-serif;background:${style.background};color:${style.fontColor};font-size:${style.fontSize}px;--cat-width:${style.categoryWidth}px;--grid-cols:${templateColumns}">` +
+        `<div class="dkm-root" style="font-family:${esc(style.fontFamily)},Segoe UI,Arial,sans-serif;background:${style.background};color:${style.fontColor};font-size:${style.fontSize}px;--cat-width:${style.categoryWidth}px;--grid-cols:${templateColumns};--header-bg:${style.headerBackground};--total-bg:${style.grandTotalBackground};--col-bg:${style.columnBackground};--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${style.columnBorderRadius}px;--col-gap:${style.columnGap}px;--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${style.rowBorderRadius}px">` +
         `<div class="dkm-scroll">` +
-        `<div class="dkm-grid" style="grid-template-columns:${templateColumns}">` +
+        `<div class="dkm-freeze">` +
+        `<div class="dkm-grid dkm-grid-freeze" style="grid-template-columns:${templateColumns};column-gap:${style.columnGap}px">` +
         renderHeader(view.columns, style) +
         total +
+        `</div></div>` +
+        `<div class="dkm-grid dkm-grid-body" style="grid-template-columns:${templateColumns};column-gap:${style.columnGap}px">` +
         bodyRows +
         `</div></div></div>`
     );

@@ -84,6 +84,8 @@ export interface TooltipLine {
 export interface MatrixRow {
     category: string;
     categoryKey: string;
+    /** Título exibido (customizado ou nome da categoria). */
+    displayTitle: string;
     iconRaw: string;
     iconPersisted?: string;
     isTotal: boolean;
@@ -138,12 +140,19 @@ export interface ResolvedVisualStyle {
     rowBorderColor: string;
     rowBorderWidth: number;
     rowBorderRadius: number;
+    columnBackground: string;
+    columnBorderColor: string;
+    columnBorderWidth: number;
+    columnBorderRadius: number;
+    columnWidth: number;
+    columnGap: number;
     headerFontSize: number;
     headerFontColor: string;
     headerBackground: string;
     headerFontWeight: string;
     tooltipEnabled: boolean;
     categoryImages: Record<string, string>;
+    categoryTitles: Record<string, string>;
 }
 
 export const defaultStyle: ResolvedVisualStyle = {
@@ -168,7 +177,7 @@ export const defaultStyle: ResolvedVisualStyle = {
     sortKpiQueryName: "",
     grandTotalShow: true,
     grandTotalLabel: "Total Geral",
-    grandTotalDisplayMode: "text",
+    grandTotalDisplayMode: "both",
     grandTotalImageData: "",
     grandTotalFontSize: 13,
     grandTotalFontColor: "#111111",
@@ -183,16 +192,23 @@ export const defaultStyle: ResolvedVisualStyle = {
     rowBorderColor: "#E1E5EA",
     rowBorderWidth: 1,
     rowBorderRadius: 0,
+    columnBackground: "#FFFFFF",
+    columnBorderColor: "#E1E5EA",
+    columnBorderWidth: 1,
+    columnBorderRadius: 0,
+    columnWidth: 140,
+    columnGap: 0,
     headerFontSize: 11,
     headerFontColor: "#5A5A5A",
     headerBackground: "#FFFFFF",
     headerFontWeight: "700",
     tooltipEnabled: true,
     categoryImages: {},
+    categoryTitles: {},
 };
 
 export const defaultKpiStyle = {
-    layout: "auto" as CellLayout,
+    layout: "vertical" as CellLayout,
     widthMode: "auto" as WidthMode,
     columnWidth: 140,
     minWidth: 96,

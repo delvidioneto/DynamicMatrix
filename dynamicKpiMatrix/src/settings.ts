@@ -1,24 +1,23 @@
 "use strict";
 
+import powerbi from "powerbi-visuals-api";
 import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
 import { defaultStyle, ResolvedVisualStyle, SortMode, DisplayMode, Align, ImagePlacement } from "./data/viewModel";
-import { parseImagesJson } from "./data/kpiMapper";
-import { upsertCategoryImage } from "./services/ImageManager";
+import {
+    CategoryMetaMap,
+    imageValueFromMeta,
+    metaFromImageValue,
+    parseCategoryMetaMap,
+    serializeCategoryMetaMap,
+    upsertCategoryMeta,
+} from "./data/categoryMeta";
 
 import FormattingSettingsCard = formattingSettings.SimpleCard;
 import FormattingSettingsSlice = formattingSettings.Slice;
 import FormattingSettingsModel = formattingSettings.Model;
 
-const LAYOUTS = [
-    { value: "auto", displayName: "Automático" },
-    { value: "vertical", displayName: "Vertical" },
-    { value: "horizontal", displayName: "Horizontal" },
-];
-
-const WIDTH_MODES = [
-    { value: "auto", displayName: "Automática" },
-    { value: "fixed", displayName: "Manual (px)" },
-];
+const EMPTY_IMAGE: powerbi.ImageValue = { name: "", url: "", scaling: "normal" };
+const PLACEHOLDER_CATEGORY = { value: "", displayName: "(selecione uma categoria)" };
 
 const SORT_MODES = [
     { value: "data", displayName: "Ordem dos dados" },
@@ -29,9 +28,9 @@ const SORT_MODES = [
 ];
 
 const DISPLAY_MODES = [
+    { value: "both", displayName: "Texto e imagem" },
     { value: "text", displayName: "Somente texto" },
     { value: "image", displayName: "Somente imagem" },
-    { value: "both", displayName: "Texto e imagem" },
 ];
 
 const ALIGNS = [
@@ -49,12 +48,6 @@ const WEIGHTS = [
     { value: "400", displayName: "Regular" },
     { value: "600", displayName: "Semibold" },
     { value: "700", displayName: "Bold" },
-];
-
-const CF_APPLY = [
-    { value: "value", displayName: "Valor principal" },
-    { value: "background", displayName: "Fundo da célula" },
-    { value: "both", displayName: "Valor e fundo" },
 ];
 
 function color(name: string, displayName: string, value: string) {
@@ -158,36 +151,51 @@ class CategoriesCard extends FormattingSettingsCard {
 }
 
 class CategoryImagesCard extends FormattingSettingsCard {
-    selectedCategory = text("selectedCategory", "Categoria selecionada", "", "Nome exato da categoria");
-    imageData = new formattingSettings.TextArea({
+    selectedCategory = new formattingSettings.ItemDropdown({
+        name: "selectedCategory",
+        displayName: "Categoria",
+        items: [PLACEHOLDER_CATEGORY],
+        value: PLACEHOLDER_CATEGORY,
+    });
+    categoryTitle = text("categoryTitle", "Título", "", "Deixe vazio para usar o nome da tabela");
+    imageData = new formattingSettings.ImageUpload({
         name: "imageData",
-        displayName: "Imagem (data URI PNG/SVG ou SVG)",
-        value: "",
-        placeholder: "data:image/png;base64,... ou <svg>...</svg>",
+        displayName: "Imagem",
+        value: { ...EMPTY_IMAGE },
+    });
+    categoriesJson = new formattingSettings.TextArea({
+        name: "categoriesJson",
+        displayName: "Mapa persistido (avançado)",
+        value: "{}",
+        placeholder: '{"Categoria":{"title":"Título","imageUrl":"data:..."}}',
     });
     imagesJson = new formattingSettings.TextArea({
         name: "imagesJson",
-        displayName: "Mapa persistido (JSON)",
+        displayName: "Legado imagesJson",
         value: "{}",
-        placeholder: '{"Categoria":"data:image/png;base64,..."}',
+        placeholder: "{}",
     });
 
     name = "categoryImages";
     displayName = "Imagens das categorias";
     description =
-        "Não há tipo oficial de upload de arquivo no capabilities.json. Persista data URI/SVG em texto. Limite recomendado ~24KB por imagem.";
-    slices: FormattingSettingsSlice[] = [this.selectedCategory, this.imageData, this.imagesJson];
+        "Selecione a categoria no dropdown, informe o Título (opcional) e importe a imagem. Sem título, usa o nome da tabela.";
+    slices: FormattingSettingsSlice[] = [
+        this.selectedCategory,
+        this.categoryTitle,
+        this.imageData,
+        this.categoriesJson,
+    ];
 }
 
 class GrandTotalCard extends FormattingSettingsCard {
     show = toggle("show", "Exibir Total Geral", defaultStyle.grandTotalShow);
-    label = text("label", "Texto", defaultStyle.grandTotalLabel);
-    displayMode = dropdown("displayMode", "Exibição", defaultStyle.grandTotalDisplayMode, DISPLAY_MODES);
-    imageData = new formattingSettings.TextArea({
+    label = text("label", "Texto", defaultStyle.grandTotalLabel, "Total Geral");
+    displayMode = dropdown("displayMode", "Exibição", "both", DISPLAY_MODES);
+    imageData = new formattingSettings.ImageUpload({
         name: "imageData",
-        displayName: "Imagem (data URI/SVG)",
-        value: "",
-        placeholder: "data:image/png;base64,...",
+        displayName: "Imagem",
+        value: { ...EMPTY_IMAGE },
     });
     fontSize = num("fontSize", "Tamanho da fonte", defaultStyle.grandTotalFontSize);
     fontColor = color("fontColor", "Cor da fonte", defaultStyle.grandTotalFontColor);
@@ -213,28 +221,51 @@ class GrandTotalCard extends FormattingSettingsCard {
 }
 
 class RowsCard extends FormattingSettingsCard {
-    defaultBackground = color("defaultBackground", "Fundo padrão", defaultStyle.rowDefaultBackground);
-    evenBackground = color("evenBackground", "Linhas pares", defaultStyle.rowEvenBackground);
-    oddBackground = color("oddBackground", "Linhas ímpares", defaultStyle.rowOddBackground);
-    zebra = toggle("zebra", "Efeito zebra", defaultStyle.zebra);
-    borderColor = color("borderColor", "Cor das bordas", defaultStyle.rowBorderColor);
-    borderWidth = num("borderWidth", "Espessura das bordas", defaultStyle.rowBorderWidth);
+    zebra = toggle("zebra", "Zebrar linhas", defaultStyle.zebra);
+    defaultBackground = color("defaultBackground", "Cor de fundo", defaultStyle.rowDefaultBackground);
+    evenBackground = color("evenBackground", "Cor (linhas pares)", defaultStyle.rowEvenBackground);
+    oddBackground = color("oddBackground", "Cor (linhas ímpares)", defaultStyle.rowOddBackground);
+    borderColor = color("borderColor", "Cor da borda", defaultStyle.rowBorderColor);
+    borderWidth = num("borderWidth", "Espessura da borda", defaultStyle.rowBorderWidth);
     borderRadius = num("borderRadius", "Arredondamento", defaultStyle.rowBorderRadius);
-    rowGap = num("rowGap", "Espaçamento vertical", defaultStyle.rowGap);
-    rowHeight = num("rowHeight", "Altura das linhas", defaultStyle.rowHeight);
+    rowHeight = num("rowHeight", "Altura da linha", defaultStyle.rowHeight);
+    rowGap = num("rowGap", "Espaçamento entre linhas", defaultStyle.rowGap);
 
     name = "rows";
-    displayName = "Cores das linhas";
+    displayName = "Linhas";
+    description = "Zebra, cores, borda, espessura e arredondamento das linhas.";
     slices: FormattingSettingsSlice[] = [
+        this.zebra,
         this.defaultBackground,
         this.evenBackground,
         this.oddBackground,
-        this.zebra,
         this.borderColor,
         this.borderWidth,
         this.borderRadius,
-        this.rowGap,
         this.rowHeight,
+        this.rowGap,
+    ];
+}
+
+class ColumnsCard extends FormattingSettingsCard {
+    background = color("background", "Cor de fundo", defaultStyle.columnBackground);
+    borderColor = color("borderColor", "Cor da borda", defaultStyle.columnBorderColor);
+    borderWidth = num("borderWidth", "Espessura da borda", defaultStyle.columnBorderWidth);
+    borderRadius = num("borderRadius", "Arredondamento", defaultStyle.columnBorderRadius);
+    columnWidth = num("columnWidth", "Largura da coluna", defaultStyle.columnWidth);
+    columnGap = num("columnGap", "Espaçamento entre colunas", defaultStyle.columnGap);
+
+    name = "columns";
+    displayName = "Colunas";
+    description =
+        "Borda, espessura, arredondamento e largura das colunas. O fundo zebrado continua vindo das Linhas.";
+    slices: FormattingSettingsSlice[] = [
+        this.background,
+        this.borderColor,
+        this.borderWidth,
+        this.borderRadius,
+        this.columnWidth,
+        this.columnGap,
     ];
 }
 
@@ -270,94 +301,6 @@ class TooltipCard extends FormattingSettingsCard {
     slices: FormattingSettingsSlice[] = [this.enabled];
 }
 
-class KpiMappingCard extends FormattingSettingsCard {
-    mappingJson = new formattingSettings.TextArea({
-        name: "mappingJson",
-        displayName: "Mapeamento KPI→complementos (JSON)",
-        value: "{}",
-        placeholder: '{"queryNameKPI":{"complements":["q1","q2"],"layout":"auto"}}',
-    });
-
-    name = "kpiMapping";
-    displayName = "Informações Complementares";
-    description =
-        "Associe até 4 complementos por KPI usando queryName. Prefira também os controles por coluna no card Indicadores (quando disponíveis via seletor de medida).";
-    slices: FormattingSettingsSlice[] = [this.mappingJson];
-}
-
-/** Card estático de defaults; overrides por KPI usam objects.kpiStyle com seletor de metadata. */
-class KpiDefaultsCard extends FormattingSettingsCard {
-    title = text("title", "Título exibido (override)", "");
-    layout = dropdown("layout", "Layout da célula", "auto", LAYOUTS);
-    complement1 = text("complement1", "Complemento 1 (queryName)", "");
-    complement2 = text("complement2", "Complemento 2 (queryName)", "");
-    complement3 = text("complement3", "Complemento 3 (queryName)", "");
-    complement4 = text("complement4", "Complemento 4 (queryName)", "");
-    complement1Label = text("complement1Label", "Rótulo complemento 1", "");
-    complement2Label = text("complement2Label", "Rótulo complemento 2", "");
-    complement3Label = text("complement3Label", "Rótulo complemento 3", "");
-    complement4Label = text("complement4Label", "Rótulo complemento 4", "");
-    widthMode = dropdown("widthMode", "Modo de largura", "auto", WIDTH_MODES);
-    columnWidth = num("columnWidth", "Largura (px)", 140);
-    minWidth = num("minWidth", "Largura mínima", 96);
-    maxWidth = num("maxWidth", "Largura máxima", 320);
-    primaryFontSize = num("primaryFontSize", "Fonte valor principal", 14);
-    complementFontSize = num("complementFontSize", "Fonte complementos", 11);
-    labelFontSize = num("labelFontSize", "Fonte rótulos", 9);
-    primaryColor = color("primaryColor", "Cor valor principal", "#1F1F1F");
-    complementColor = color("complementColor", "Cor complementos", "#4A4A4A");
-    labelColor = color("labelColor", "Cor rótulos", "#6B6B6B");
-    headerColor = color("headerColor", "Cor cabeçalho", "#5A5A5A");
-    backgroundColor = color("backgroundColor", "Fundo da célula", "#FFFFFF");
-    cellPadding = num("cellPadding", "Espaçamento interno", 8);
-    cfEnabled = toggle("cfEnabled", "Formatação condicional", false);
-    cfApplyTo = dropdown("cfApplyTo", "Aplicar CF a", "value", CF_APPLY);
-    cfThresholdHigh = num("cfThresholdHigh", "Limite alto (≥)", 1);
-    cfThresholdMid = num("cfThresholdMid", "Limite médio (≥)", 0.9);
-    cfColorHigh = color("cfColorHigh", "Cor alta", "#107C10");
-    cfColorMid = color("cfColorMid", "Cor média", "#F7B500");
-    cfColorLow = color("cfColorLow", "Cor baixa", "#D13438");
-    cfAsPercent = toggle("cfAsPercent", "Tratar valor como percentual", true);
-
-    name = "kpiStyle";
-    displayName = "Indicadores (KPIs)";
-    description =
-        "Para configurar um KPI específico, selecione a medida no visual e ajuste estas propriedades (seletor por coluna). Complementos: informe o queryName da medida do well Informações complementares.";
-    slices: FormattingSettingsSlice[] = [
-        this.title,
-        this.layout,
-        this.complement1,
-        this.complement1Label,
-        this.complement2,
-        this.complement2Label,
-        this.complement3,
-        this.complement3Label,
-        this.complement4,
-        this.complement4Label,
-        this.widthMode,
-        this.columnWidth,
-        this.minWidth,
-        this.maxWidth,
-        this.primaryFontSize,
-        this.complementFontSize,
-        this.labelFontSize,
-        this.primaryColor,
-        this.complementColor,
-        this.labelColor,
-        this.headerColor,
-        this.backgroundColor,
-        this.cellPadding,
-        this.cfEnabled,
-        this.cfApplyTo,
-        this.cfThresholdHigh,
-        this.cfThresholdMid,
-        this.cfColorHigh,
-        this.cfColorMid,
-        this.cfColorLow,
-        this.cfAsPercent,
-    ];
-}
-
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     general = new GeneralCard();
     categories = new CategoriesCard();
@@ -365,8 +308,7 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     grandTotal = new GrandTotalCard();
     header = new HeaderCard();
     rows = new RowsCard();
-    kpiStyle = new KpiDefaultsCard();
-    kpiMapping = new KpiMappingCard();
+    columns = new ColumnsCard();
     subTotals = new SubTotalsCard();
     tooltip = new TooltipCard();
 
@@ -377,20 +319,69 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         this.grandTotal,
         this.header,
         this.rows,
-        this.kpiStyle,
-        this.kpiMapping,
+        this.columns,
         this.subTotals,
         this.tooltip,
     ];
 
-    public toResolvedStyle(): ResolvedVisualStyle {
-        const imagesJson = this.categoryImages.imagesJson.value || "{}";
-        let images = parseImagesJson(imagesJson);
-        const selected = this.categoryImages.selectedCategory.value?.trim() || "";
-        const imageData = this.categoryImages.imageData.value || "";
+    public getSelectedCategoryName(): string {
+        return String(this.categoryImages.selectedCategory.value?.value ?? "").trim();
+    }
+
+    public getCategoryMetaMap(): CategoryMetaMap {
+        return parseCategoryMetaMap(
+            this.categoryImages.categoriesJson.value,
+            this.categoryImages.imagesJson.value,
+        );
+    }
+
+    /** Mescla título/imagem da categoria selecionada no mapa persistente. */
+    public buildSyncedCategoriesJson(): string {
+        const selected = this.getSelectedCategoryName();
+        let map = this.getCategoryMetaMap();
         if (selected) {
-            images = upsertCategoryImage(images, selected, imageData);
+            const imageMeta = metaFromImageValue(this.categoryImages.imageData.value);
+            map = upsertCategoryMeta(map, selected, {
+                title: this.categoryImages.categoryTitle.value || "",
+                imageUrl: imageMeta.imageUrl || "",
+                imageName: imageMeta.imageName || "",
+            });
         }
+        return serializeCategoryMetaMap(map);
+    }
+
+    public syncCategoryEditorFromMap(categoryNames: string[]): void {
+        const items = [
+            PLACEHOLDER_CATEGORY,
+            ...categoryNames.map((name) => ({ value: name, displayName: name })),
+        ];
+        this.categoryImages.selectedCategory.items = items;
+
+        const selected = this.getSelectedCategoryName();
+        const match = items.find((i) => i.value === selected) ?? PLACEHOLDER_CATEGORY;
+        this.categoryImages.selectedCategory.value = match;
+
+        const map = this.getCategoryMetaMap();
+        const meta = selected ? map[selected] : undefined;
+        this.categoryImages.categoryTitle.value = meta?.title || "";
+        this.categoryImages.imageData.value = imageValueFromMeta(meta);
+    }
+
+    public toResolvedStyle(): ResolvedVisualStyle {
+        const map = parseCategoryMetaMap(this.buildSyncedCategoriesJson());
+        const images: Record<string, string> = {};
+        const titles: Record<string, string> = {};
+        for (const [key, meta] of Object.entries(map)) {
+            if (meta.imageUrl) {
+                images[key] = meta.imageUrl;
+            }
+            if (meta.title) {
+                titles[key] = meta.title;
+            }
+        }
+
+        const grandImage = metaFromImageValue(this.grandTotal.imageData.value).imageUrl || "";
+        const label = (this.grandTotal.label.value || "").trim() || defaultStyle.grandTotalLabel;
 
         return {
             fontFamily: this.general.fontFamily.value || defaultStyle.fontFamily,
@@ -413,9 +404,9 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             sortMode: String(this.categories.sortMode.value.value) as SortMode,
             sortKpiQueryName: this.categories.sortKpiQueryName.value || "",
             grandTotalShow: this.grandTotal.show.value,
-            grandTotalLabel: this.grandTotal.label.value || defaultStyle.grandTotalLabel,
+            grandTotalLabel: label,
             grandTotalDisplayMode: String(this.grandTotal.displayMode.value.value) as DisplayMode,
-            grandTotalImageData: this.grandTotal.imageData.value || "",
+            grandTotalImageData: grandImage,
             grandTotalFontSize: this.grandTotal.fontSize.value,
             grandTotalFontColor: this.grandTotal.fontColor.value.value,
             grandTotalBackground: this.grandTotal.background.value.value,
@@ -429,12 +420,19 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             rowBorderColor: this.rows.borderColor.value.value,
             rowBorderWidth: this.rows.borderWidth.value,
             rowBorderRadius: this.rows.borderRadius.value,
+            columnBackground: this.columns.background.value.value,
+            columnBorderColor: this.columns.borderColor.value.value,
+            columnBorderWidth: this.columns.borderWidth.value,
+            columnBorderRadius: this.columns.borderRadius.value,
+            columnWidth: this.columns.columnWidth.value,
+            columnGap: this.columns.columnGap.value,
             headerFontSize: this.header.fontSize.value,
             headerFontColor: this.header.fontColor.value.value,
             headerBackground: this.header.background.value.value,
             headerFontWeight: String(this.header.fontWeight.value.value),
             tooltipEnabled: this.tooltip.enabled.value,
             categoryImages: images,
+            categoryTitles: titles,
         };
     }
 
@@ -444,7 +442,9 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             totalLabel: style.grandTotalLabel,
             sortMode: style.sortMode,
             sortKpiQueryName: style.sortKpiQueryName,
-            imagesJson: JSON.stringify(style.categoryImages),
+            categoriesJson: this.buildSyncedCategoriesJson(),
+            imagesJson: this.categoryImages.imagesJson.value || "{}",
+            showTotal: style.grandTotalShow,
         };
     }
 }

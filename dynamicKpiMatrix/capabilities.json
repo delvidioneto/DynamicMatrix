@@ -102,8 +102,10 @@
         },
         "categoryImages": {
             "properties": {
+                "categoriesJson": { "type": { "text": true } },
                 "imagesJson": { "type": { "text": true } },
                 "selectedCategory": { "type": { "text": true } },
+                "categoryTitle": { "type": { "text": true } },
                 "imageData": { "type": { "text": true } }
             }
         },
@@ -148,6 +150,16 @@
                 "borderRadius": { "type": { "numeric": true } },
                 "rowGap": { "type": { "numeric": true } },
                 "rowHeight": { "type": { "numeric": true } }
+            }
+        },
+        "columns": {
+            "properties": {
+                "background": { "type": { "fill": { "solid": { "color": true } } } },
+                "borderColor": { "type": { "fill": { "solid": { "color": true } } } },
+                "borderWidth": { "type": { "numeric": true } },
+                "borderRadius": { "type": { "numeric": true } },
+                "columnWidth": { "type": { "numeric": true } },
+                "columnGap": { "type": { "numeric": true } }
             }
         },
         "header": {

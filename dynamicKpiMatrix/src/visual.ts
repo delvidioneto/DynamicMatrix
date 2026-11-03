@@ -30,6 +30,9 @@ export class Visual implements IVisual {
     private selectionIds: ISelectionId[] = [];
     private activeTip: HTMLElement | null = null;
     private lastView: VisualViewModel | null = null;
+    private lastPersistedCategoriesJson = "";
+    /** Categoria à qual título/imagem do editor pertencem (evita gravar no KPI errado ao trocar o dropdown). */
+    private editorCategoryKey = "";
 
     constructor(options: VisualConstructorOptions) {
         this.events = options.host.eventService;
@@ -60,9 +63,13 @@ export class Visual implements IVisual {
             }
 
             this.selectionIds = this.buildSelectionIds(dataView);
+            this.syncCategoryEditorState();
+
             const style = this.formattingSettings.toResolvedStyle();
             const view = convertDataView(dataView, this.formattingSettings.convertOptions());
             this.lastView = view;
+            this.formattingSettings.syncCategoryEditorFromMap(view.categoryNames);
+
             // HTML gerado pelo próprio visual (não é input livre do usuário).
             // eslint-disable-next-line powerbi-visuals/no-inner-outer-html
             this.host.innerHTML = buildMatrixHtml(view, style);
@@ -73,6 +80,9 @@ export class Visual implements IVisual {
     }
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
+        if (this.lastView) {
+            this.formattingSettings.syncCategoryEditorFromMap(this.lastView.categoryNames);
+        }
         const model = this.formattingSettingsService.buildFormattingModel(this.formattingSettings);
         if (this.lastView?.columns.length) {
             const card = buildKpiContainerCard(this.lastView.columns, this.lastView.complementOptions);
@@ -91,6 +101,38 @@ export class Visual implements IVisual {
         this.host.removeEventListener("pointerleave", this.onPointerLeave);
     }
 
+    private syncCategoryEditorState(): void {
+        const selected = this.formattingSettings.getSelectedCategoryName();
+        if (this.editorCategoryKey && this.editorCategoryKey !== selected) {
+            // Dropdown mudou: não mesclar título/imagem antigos na nova categoria.
+            this.formattingSettings.syncCategoryEditorFromMap(this.lastView?.categoryNames ?? []);
+            this.editorCategoryKey = selected;
+            return;
+        }
+
+        if (selected) {
+            const synced = this.formattingSettings.buildSyncedCategoriesJson();
+            const current =
+                this.formattingSettings.categoryImages.categoriesJson.value?.trim() || "{}";
+            if (synced !== current && synced !== this.lastPersistedCategoriesJson) {
+                this.lastPersistedCategoriesJson = synced;
+                this.formattingSettings.categoryImages.categoriesJson.value = synced;
+                this.visualHost.persistProperties({
+                    merge: [
+                        {
+                            objectName: "categoryImages",
+                            selector: null as unknown as powerbi.data.Selector,
+                            properties: {
+                                categoriesJson: synced,
+                            },
+                        },
+                    ],
+                });
+            }
+        }
+        this.editorCategoryKey = selected;
+    }
+
     private buildSelectionIds(dataView?: powerbi.DataView): ISelectionId[] {
         const matrix = dataView?.matrix;
         const children = matrix?.rows?.root?.children ?? [];
@@ -99,19 +141,21 @@ export class Visual implements IVisual {
             return [];
         }
 
-        return children.map((node) => {
-            if ((node as { isSubtotal?: boolean }).isSubtotal) {
-                return null;
-            }
-            try {
-                return this.visualHost
-                    .createSelectionIdBuilder()
-                    .withMatrixNode(node, levels)
-                    .createSelectionId();
-            } catch {
-                return null;
-            }
-        }).filter((id): id is ISelectionId => Boolean(id));
+        return children
+            .map((node) => {
+                if ((node as { isSubtotal?: boolean }).isSubtotal) {
+                    return null;
+                }
+                try {
+                    return this.visualHost
+                        .createSelectionIdBuilder()
+                        .withMatrixNode(node, levels)
+                        .createSelectionId();
+                } catch {
+                    return null;
+                }
+            })
+            .filter((id): id is ISelectionId => Boolean(id));
     }
 
     private onPointerOver = (event: PointerEvent) => {
@@ -176,7 +220,6 @@ export class Visual implements IVisual {
         if (!(target instanceof Element)) {
             return null;
         }
-        // Tooltip exclusivamente na coluna de categorias.
         return target.closest(".dkm-cat.dkm-tip") as HTMLElement | null;
     }
 

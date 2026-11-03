@@ -3,6 +3,7 @@
 import { convertDataView } from "./dataConverter";
 import { formatMeasureValue, normalizeCfRatio } from "./formatValue";
 import { buildKpiColumns, collectMeasures, parseMappingJson, syncMappingJson } from "./kpiMapper";
+import { parseCategoryMetaMap, upsertCategoryMeta } from "./categoryMeta";
 import { applyConditionalColors } from "../services/ConditionalFormatting";
 import { sanitizeSvg, isDataImageUri } from "../services/SvgSanitizer";
 import { resolveImageSource, validatePersistedImage } from "../services/ImageManager";
@@ -174,7 +175,9 @@ function assert(condition: unknown, message: string): asserts condition {
         totalLabel: "Total Geral",
         sortMode: "alphaAsc",
         sortKpiQueryName: "",
+        categoriesJson: "{}",
         imagesJson: "{}",
+        showTotal: true,
     });
 
     assert(view.columns.length === 1, "one kpi");
@@ -183,8 +186,48 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(view.rows[0].category === "Produto A", "alpha sort");
     assert(view.totalRow, "total row from matrix subtotal");
     assert(view.totalRow!.isTotal, "total flagged");
+    assert(view.totalRow!.displayTitle === "Total Geral", "total title");
     assert(view.totalRow!.cells[0].primary.raw === 100, "DAX total not sum of rows");
-    // If we summed rows we'd get 100 too in this sample — change assertion with non-additive:
+}
+
+// Fallback: soma das linhas quando não há subtotal
+{
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    children: [
+                        { value: "A", values: { 0: { value: 10 }, 1: { value: 1 } } },
+                        { value: "B", values: { 0: { value: 15 }, 1: { value: 2 } } },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Billing", roles: { kpis: true }, format: "$#,0" },
+                { queryName: "comp1", displayName: "IBP", roles: { complements: true }, format: "0%" },
+            ],
+        },
+        metadata: {
+            columns: [
+                {
+                    queryName: "kpiA",
+                    roles: { kpis: true },
+                    objects: { kpiStyle: { complement1: "comp1" } },
+                },
+                { queryName: "comp1", roles: { complements: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total Geral",
+        sortMode: "data",
+        sortKpiQueryName: "",
+        categoriesJson: "{}",
+        showTotal: true,
+    });
+    assert(view.totalRow, "fallback total exists");
+    assert(view.totalRow!.cells[0].primary.raw === 25, `sum primary got ${view.totalRow!.cells[0].primary.raw}`);
 }
 
 // Non-additive total proof: average-like values must come from subtotal node, not average of rows
@@ -209,7 +252,8 @@ function assert(condition: unknown, message: string): asserts condition {
         totalLabel: "Total",
         sortMode: "data",
         sortKpiQueryName: "",
-        imagesJson: "{}",
+        categoriesJson: "{}",
+        showTotal: true,
     });
     assert(view.totalRow!.cells[0].primary.raw === 0.99, "uses matrix subtotal, not mean of 1.1 and 0.8");
     const mean = (1.1 + 0.8) / 2;
@@ -247,6 +291,7 @@ function assert(condition: unknown, message: string): asserts condition {
                 {
                     category: "Produto A",
                     categoryKey: "Produto A",
+                    displayTitle: "Produto A",
                     iconRaw: "",
                     isTotal: false,
                     sourceIndex: 0,
@@ -271,6 +316,7 @@ function assert(condition: unknown, message: string): asserts condition {
             totalRow: {
                 category: "Total Geral",
                 categoryKey: "Total Geral",
+                displayTitle: "Total Geral",
                 iconRaw: "",
                 isTotal: true,
                 sourceIndex: -1,
@@ -291,9 +337,18 @@ function assert(condition: unknown, message: string): asserts condition {
     );
     assert(html.includes("Produto A"), "category rendered");
     assert(html.includes("Total Geral"), "total rendered");
+    assert(html.includes("dkm-freeze"), "sticky freeze block");
     assert(html.includes("dkm-tip"), "category tip class");
     assert(html.includes("Billing"), "header");
     assert(html.includes("110.00%"), "complement value");
+}
+
+// category meta title override
+{
+    let map = parseCategoryMetaMap('{"A":{"title":"Alpha","imageUrl":"data:image/png;base64,xx"}}');
+    assert(map.A.title === "Alpha", "title parsed");
+    map = upsertCategoryMeta(map, "A", { title: "" });
+    assert(!map.A?.title, "title cleared");
 }
 
 console.log("All Dynamic KPI Matrix tests passed.");
