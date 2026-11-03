@@ -193,6 +193,31 @@ function readIconRaw(node: DataViewMatrixNode | undefined, measure: MeasureRef |
     return unwrapMeasureText(String(readMatrixValue(node, measure.valueSourceIndex) ?? ""));
 }
 
+/**
+ * Medidas de ícone costumam usar SELECTEDVALUE/HASONEVALUE e voltam em branco no
+ * contexto do total, mesmo quando a linha da categoria tem o SVG. Nesse caso
+ * reaproveita o primeiro valor não vazio das linhas de detalhe.
+ */
+function firstDetailIcon(nodes: DataViewMatrixNode[], measure: MeasureRef | undefined): string {
+    if (!measure) {
+        return "";
+    }
+    for (const node of nodes) {
+        if (isSubtotalNode(node)) {
+            continue;
+        }
+        const raw = readIconRaw(node, measure);
+        if (raw) {
+            return raw;
+        }
+        const nested = firstDetailIcon(node.children ?? [], measure);
+        if (nested) {
+            return nested;
+        }
+    }
+    return "";
+}
+
 function resolveRowIconMeasure(
     metaMap: CategoryMetaMap,
     category: string,
@@ -431,13 +456,14 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             totalRow.displayMode = options.grandTotalDisplayMode || "both";
             totalRow.isTotal = true;
 
-            // Mesma regra das categorias: medida SVG escolhida, avaliada no contexto do total.
-            // Tenta subtotal e root (hosts variam onde enviam o valor da medida de ícone).
+            // Contexto do total primeiro. Se a medida vier em branco (SELECTEDVALUE no total),
+            // usa o mesmo SVG que já apareceu na linha da categoria.
             const totalIcon = findIconMeasure(measures, options.grandTotalIconQueryName);
             if (totalIcon) {
                 const fromSub = readIconRaw(subtotalNode, totalIcon);
                 const fromRoot = readIconRaw(root, totalIcon);
-                totalRow.iconRaw = fromSub || fromRoot || totalRow.iconRaw || "";
+                const fromDetail = firstDetailIcon(dataNodes, totalIcon);
+                totalRow.iconRaw = fromSub || fromRoot || totalRow.iconRaw || fromDetail || "";
             }
         }
     }

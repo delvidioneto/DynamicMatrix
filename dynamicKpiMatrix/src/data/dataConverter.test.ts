@@ -420,6 +420,69 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(view.totalRow!.displayMode === "image", "total image-only mode");
 }
 
+// Total Geral: a medida volta em branco no subtotal e o SVG só existe na linha
+{
+    const svgSurgery = "<svg id='surgery'><circle r='3'/></svg>";
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    values: {
+                        0: { value: 100 },
+                        1: { value: null },
+                    },
+                    children: [
+                        {
+                            isSubtotal: true,
+                            values: {
+                                0: { value: 100 },
+                                1: { value: null },
+                            },
+                        },
+                        {
+                            value: "Surgery",
+                            values: {
+                                0: { value: 40 },
+                                1: { value: svgSurgery },
+                            },
+                        },
+                        {
+                            value: "Ortho",
+                            values: {
+                                0: { value: 60 },
+                                1: { value: null },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Billing", roles: { kpis: true } },
+                { queryName: "svgSurgery", displayName: "SVG Surgery", roles: { categoryIcon: true } },
+            ],
+        },
+        metadata: {
+            columns: [
+                { queryName: "kpiA", roles: { kpis: true } },
+                { queryName: "svgSurgery", roles: { categoryIcon: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total Geral",
+        sortMode: "data",
+        categoriesJson: JSON.stringify({
+            Surgery: { displayMode: "both", iconQueryName: "svgSurgery" },
+        }),
+        showTotal: true,
+        grandTotalIconQueryName: "svgSurgery",
+        grandTotalDisplayMode: "both",
+    });
+    assert(view.rows.find((r) => r.category === "Surgery")!.iconRaw.includes("id='surgery'"), "category keeps svg");
+    assert(view.totalRow!.iconRaw.includes("id='surgery'"), "total reuses category svg when total context is blank");
+}
+
 // --- renderer ---
 {
     const html = buildMatrixHtml(

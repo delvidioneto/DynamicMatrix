@@ -13,7 +13,7 @@ import ITooltipService = powerbi.extensibility.ITooltipService;
 import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 import ISelectionId = powerbi.visuals.ISelectionId;
 
-import { VisualFormattingSettingsModel } from "./settings";
+import { readStoredText, VisualFormattingSettingsModel } from "./settings";
 import { convertDataView } from "./data/dataConverter";
 import { collectMeasures } from "./data/kpiMapper";
 import { buildMatrixHtml, parseCellTooltip } from "./components/MatrixRenderer";
@@ -44,6 +44,8 @@ export class Visual implements IVisual {
     private editorCategoryKey = "";
     /** Seleção persistida — sobrevive ao populate que limpa o ItemDropdown. */
     private stickySelectedCategory = "";
+    /** Medida SVG do Total Geral — o populate zera o dropdown antes dos itens existirem. */
+    private stickyGrandTotalIcon = "";
     /** Cache de imagens por categoria (sobrevive a update que limpa ImageUpload). */
     private categoryImageCache: Record<string, string> = {};
     private grandTotalImageCache = "";
@@ -68,6 +70,10 @@ export class Visual implements IVisual {
         this.events.renderingStarted(options);
         try {
             this.hideTip();
+            const liveGrandTotalIcon = this.formattingSettings.getGrandTotalIconQueryName();
+            if (liveGrandTotalIcon) {
+                this.stickyGrandTotalIcon = liveGrandTotalIcon;
+            }
             const dataView = options.dataViews?.[0];
             if (dataView) {
                 this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
@@ -95,21 +101,15 @@ export class Visual implements IVisual {
             const earlyIcons = collectMeasures(dataView?.matrix?.valueSources)
                 .filter((m) => m.role === "categoryIcon")
                 .map((m) => ({ queryName: m.queryName, displayName: m.displayName }));
-            const gtObjects = dataView?.metadata?.objects?.grandTotal as
-                | { iconMeasure?: unknown }
-                | undefined;
-            const persistedGtIcon =
-                typeof gtObjects?.iconMeasure === "string" ? gtObjects.iconMeasure.trim() : "";
-            this.formattingSettings.syncIconMeasureOptions(
-                earlyIcons,
-                persistedGtIcon || this.formattingSettings.getGrandTotalIconQueryName(),
+            const persistedGtIcon = readStoredText(
+                (dataView?.metadata?.objects?.grandTotal as { iconMeasure?: unknown } | undefined)?.iconMeasure,
             );
-            if (persistedGtIcon) {
-                this.formattingSettings.ensureIconMeasureItem(
-                    this.formattingSettings.grandTotal.iconMeasure,
-                    persistedGtIcon,
-                );
+            const grandTotalIcon =
+                liveGrandTotalIcon || persistedGtIcon || this.stickyGrandTotalIcon;
+            if (grandTotalIcon) {
+                this.stickyGrandTotalIcon = grandTotalIcon;
             }
+            this.formattingSettings.syncIconMeasureOptions(earlyIcons, grandTotalIcon);
 
             const style = this.formattingSettings.toResolvedStyle();
             // Garante imagens do cache de sessão no estilo (mesmo se o JSON ainda não voltou do host).
@@ -131,7 +131,7 @@ export class Visual implements IVisual {
             this.lastView = view;
             this.formattingSettings.syncIconMeasureOptions(
                 view.iconMeasureOptions,
-                persistedGtIcon || this.formattingSettings.getGrandTotalIconQueryName(),
+                this.stickyGrandTotalIcon || this.formattingSettings.getGrandTotalIconQueryName(),
             );
             this.formattingSettings.syncCategoryEditorFromMap(
                 view.categoryNames,

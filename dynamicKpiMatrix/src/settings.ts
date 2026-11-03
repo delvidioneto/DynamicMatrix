@@ -116,6 +116,23 @@ function dropdown(
     });
 }
 
+/** Texto persistido em object property: string crua ou item de dropdown `{ value }`. */
+export function readStoredText(value: unknown): string {
+    if (typeof value === "string") {
+        return value.trim();
+    }
+    if (value && typeof value === "object") {
+        const record = value as { value?: unknown; displayName?: unknown };
+        if (typeof record.value === "string" && record.value.trim()) {
+            return record.value.trim();
+        }
+        if (typeof record.displayName === "string" && record.displayName.trim()) {
+            return record.displayName.trim();
+        }
+    }
+    return "";
+}
+
 function asDisplayMode(value: unknown, fallback: DisplayMode = "text"): DisplayMode {
     const raw = String(
         (value as { value?: string } | undefined)?.value ?? value ?? "",
@@ -671,20 +688,16 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             this.categoryImages.categoryDisplayMode.value = match;
         }
 
-        const iconQn =
-            typeof source.categoryIconMeasure === "string"
-                ? source.categoryIconMeasure.trim()
-                : typeof source.iconMeasure === "string"
-                  ? source.iconMeasure.trim()
-                  : "";
+        const iconQn = readStoredText(source.categoryIconMeasure) || readStoredText(source.iconMeasure);
         if (iconQn) {
             this.ensureIconMeasureItem(this.categoryImages.categoryIconMeasure, iconQn);
         }
 
         const gtObj = objects.grandTotal as Record<string, unknown> | undefined;
         if (gtObj) {
-            if (typeof gtObj.iconMeasure === "string" && gtObj.iconMeasure.trim()) {
-                this.ensureIconMeasureItem(this.grandTotal.iconMeasure, gtObj.iconMeasure.trim());
+            const gtIcon = readStoredText(gtObj.iconMeasure);
+            if (gtIcon) {
+                this.ensureIconMeasureItem(this.grandTotal.iconMeasure, gtIcon);
             }
             const upload = coerceImageValue(gtObj.imageData);
             const urlText = unwrapMeasureText(
