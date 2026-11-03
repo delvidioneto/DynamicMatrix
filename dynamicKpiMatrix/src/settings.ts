@@ -341,18 +341,43 @@ class ValuesCard extends FormattingSettingsCard {
         value: defaultStyle.valueDisplayUnits,
     });
     precision = num("precision", "Casas decimais", defaultStyle.valuePrecision);
+    borderLeft = toggle("borderLeft", "Borda esquerda", defaultStyle.valueBorderLeft);
+    borderRight = toggle("borderRight", "Borda direita", defaultStyle.valueBorderRight);
+    borderTop = toggle("borderTop", "Borda superior", defaultStyle.valueBorderTop);
+    borderBottom = toggle("borderBottom", "Borda inferior", defaultStyle.valueBorderBottom);
+    borderColor = color("borderColor", "Cor da borda", defaultStyle.valueBorderColor);
+    borderWidth = num("borderWidth", "Espessura da borda", defaultStyle.valueBorderWidth);
+    borderRadius = num("borderRadius", "Arredondamento", defaultStyle.valueBorderRadius);
 
     name = "values";
     displayName = "Valores";
     description =
-        "Tamanho, alinhamento e unidades de exibição (Automático, Nenhum, Milhares, Milhões, Bilhões, Trilhões).";
+        "Formatação do bloco valor + complementos: texto, unidades e bordas por lado.";
     slices: FormattingSettingsSlice[] = [
         this.fontSize,
         this.fontColor,
         this.alignment,
         this.displayUnits,
         this.precision,
+        this.borderLeft,
+        this.borderRight,
+        this.borderTop,
+        this.borderBottom,
+        this.borderColor,
+        this.borderWidth,
+        this.borderRadius,
     ];
+
+    public onPreProcess(): void {
+        const anyBorder =
+            this.borderLeft.value ||
+            this.borderRight.value ||
+            this.borderTop.value ||
+            this.borderBottom.value;
+        this.borderColor.visible = anyBorder;
+        this.borderWidth.visible = anyBorder;
+        this.borderRadius.visible = anyBorder;
+    }
 }
 
 class HeaderCard extends FormattingSettingsCard {
@@ -754,6 +779,13 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             valueAlignment: String(this.values.alignment.value.value) as Align,
             valueDisplayUnits: Number(this.values.displayUnits.value ?? 0),
             valuePrecision: this.values.precision.value,
+            valueBorderLeft: this.values.borderLeft.value,
+            valueBorderRight: this.values.borderRight.value,
+            valueBorderTop: this.values.borderTop.value,
+            valueBorderBottom: this.values.borderBottom.value,
+            valueBorderColor: this.values.borderColor.value.value,
+            valueBorderWidth: this.values.borderWidth.value,
+            valueBorderRadius: this.values.borderRadius.value,
             headerFontSize: this.header.fontSize.value,
             headerFontColor: this.header.fontColor.value.value,
             headerBackground: this.header.background.value.value,

@@ -117,6 +117,7 @@ export class Visual implements IVisual {
         this.formattingSettings.categoryImages.onPreProcess();
         this.formattingSettings.grandTotal.onPreProcess();
         this.formattingSettings.columns.onPreProcess();
+        this.formattingSettings.values.onPreProcess();
         const model = this.formattingSettingsService.buildFormattingModel(this.formattingSettings);
         if (this.lastView?.columns.length) {
             const card = buildKpiContainerCard(this.lastView.columns, this.lastView.complementOptions);

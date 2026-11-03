@@ -211,7 +211,14 @@
                 "precision": {
                     "displayName": "Casas decimais",
                     "type": { "numeric": true }
-                }
+                },
+                "borderLeft": { "displayName": "Borda esquerda", "type": { "bool": true } },
+                "borderRight": { "displayName": "Borda direita", "type": { "bool": true } },
+                "borderTop": { "displayName": "Borda superior", "type": { "bool": true } },
+                "borderBottom": { "displayName": "Borda inferior", "type": { "bool": true } },
+                "borderColor": { "displayName": "Cor da borda", "type": { "fill": { "solid": { "color": true } } } },
+                "borderWidth": { "displayName": "Espessura da borda", "type": { "numeric": true } },
+                "borderRadius": { "displayName": "Arredondamento da borda", "type": { "numeric": true } }
             }
         },
         "header": {

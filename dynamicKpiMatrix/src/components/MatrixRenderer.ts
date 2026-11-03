@@ -246,6 +246,17 @@ function kpiCellHtml(cell: KpiCellData, col: KpiColumnConfig, style: ResolvedVis
     const bg = cell.backgroundColor ?? col.backgroundColor ?? "transparent";
     const pad = col.cellPadding;
     const align = style.valueAlignment || "left";
+    const bw = Math.max(0, style.valueBorderWidth || 0);
+    const bc = style.valueBorderColor || "#D0D0D0";
+    const br = Math.max(0, style.valueBorderRadius || 0);
+    const borderCss =
+        `border-style:solid;` +
+        `border-color:${bc};` +
+        `border-left-width:${style.valueBorderLeft ? bw : 0}px;` +
+        `border-right-width:${style.valueBorderRight ? bw : 0}px;` +
+        `border-top-width:${style.valueBorderTop ? bw : 0}px;` +
+        `border-bottom-width:${style.valueBorderBottom ? bw : 0}px;` +
+        `border-radius:${br}px;`;
 
     const comps = cell.complements
         .filter((c) => c.value.text)
@@ -279,7 +290,7 @@ function kpiCellHtml(cell: KpiCellData, col: KpiColumnConfig, style: ResolvedVis
         : `<div class="dkm-primary dkm-blank">—</div>`;
 
     return (
-        `<div class="dkm-kpi dkm-layout-${layout}" style="background:${bg};padding:${pad}px;text-align:${align};align-items:${align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start"}">` +
+        `<div class="dkm-kpi dkm-layout-${layout}" style="background:${bg};padding:${pad}px;text-align:${align};align-items:${align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start"};${borderCss}">` +
         primary +
         (comps ? `<div class="dkm-comps">${comps}</div>` : "") +
         `</div>`

@@ -173,6 +173,13 @@ export interface ResolvedVisualStyle {
     valueAlignment: Align;
     valueDisplayUnits: number;
     valuePrecision: number;
+    valueBorderLeft: boolean;
+    valueBorderRight: boolean;
+    valueBorderTop: boolean;
+    valueBorderBottom: boolean;
+    valueBorderColor: string;
+    valueBorderWidth: number;
+    valueBorderRadius: number;
     headerFontSize: number;
     headerFontColor: string;
     headerBackground: string;
@@ -233,6 +240,13 @@ export const defaultStyle: ResolvedVisualStyle = {
     valueAlignment: "left",
     valueDisplayUnits: 0,
     valuePrecision: -1,
+    valueBorderLeft: false,
+    valueBorderRight: false,
+    valueBorderTop: false,
+    valueBorderBottom: false,
+    valueBorderColor: "#D0D0D0",
+    valueBorderWidth: 1,
+    valueBorderRadius: 0,
     headerFontSize: 11,
     headerFontColor: "#5A5A5A",
     headerBackground: "#FFFFFF",
