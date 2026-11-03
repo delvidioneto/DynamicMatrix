@@ -48,11 +48,10 @@ function isSubtotalNode(node: DataViewMatrixNode): boolean {
 }
 
 /**
- * A chave de `node.values` é o id da interseção da matriz.
- * A medida certa é `valueSourceIndex`, que pode não coincidir com essa chave.
- * No nó de Total o host às vezes envia `valueSourceIndex` como string ("1");
- * comparação estrita com number falhava e o complemento ficava sem valor
- * (rótulo da config aparecia, valor em branco).
+ * Ordem de leitura (igual à versão estável + correção do 186%):
+ * 1) valueSourceIndex (evita pegar a medida errada quando a chave ≠ índice)
+ * 2) chave direta sourceIndex
+ * 3) N-ésima chave numérica ordenada (necessário no Total Geral / folhas de coluna)
  */
 function findValueEntry(
     node: DataViewMatrixNode | undefined,
@@ -89,29 +88,34 @@ function findValueEntry(
 }
 
 export function readMatrixValue(node: DataViewMatrixNode | undefined, sourceIndex: number): unknown {
+    if (!node?.values || sourceIndex < 0) {
+        return null;
+    }
+    const values = node.values as Record<string | number, MatrixValueEntry | PrimitiveCell>;
+
     const entry = findValueEntry(node, sourceIndex);
     if (entry && entry.value !== undefined) {
         return entry.value;
     }
-    // Fallback: no Total as chaves de values às vezes são ids de folha da coluna
-    // (não 0..n) e valueSourceIndex vem omitido. Usa a N-ésima entrada ordenada.
-    if (!node?.values || sourceIndex < 0) {
-        return null;
+
+    // Fallback ordinal — restaurado: no Total Geral as chaves nem sempre são 0..n.
+    const numericKeys = Object.keys(values)
+        .map((k) => Number(k))
+        .filter((k) => Number.isFinite(k))
+        .sort((a, b) => a - b);
+    if (numericKeys[sourceIndex] != null) {
+        const keyed = values[numericKeys[sourceIndex]] ?? values[String(numericKeys[sourceIndex])];
+        if (keyed == null) {
+            return null;
+        }
+        if (typeof keyed !== "object") {
+            return keyed;
+        }
+        if (keyed.value !== undefined) {
+            return keyed.value;
+        }
     }
-    const sorted = Object.entries(node.values as Record<string, MatrixValueEntry | PrimitiveCell>)
-        .filter(([, e]) => e != null)
-        .sort((a, b) => Number(a[0]) - Number(b[0]));
-    const hasExplicitSource = sorted.some(
-        ([, e]) => typeof e === "object" && e != null && (e as MatrixValueEntry).valueSourceIndex != null,
-    );
-    if (hasExplicitSource || sourceIndex >= sorted.length) {
-        return null;
-    }
-    const ordinal = sorted[sourceIndex][1];
-    if (typeof ordinal !== "object") {
-        return ordinal;
-    }
-    return ordinal.value !== undefined ? ordinal.value : null;
+    return null;
 }
 
 /**
@@ -409,11 +413,8 @@ function sumTotalFromRows(
                 primaryCount += 1;
             }
             cell.complements.forEach((comp, i) => {
-                const slotFormat = col.complements[i]?.format ?? "";
-                // Percentual não é aditivo: somar 40% + 53% vira 93% (ou 186% depois da escala).
-                if (slotFormat.includes("%")) {
-                    return;
-                }
+                // Fallback só quando o host não envia subtotal DAX: inclui complementos
+                // (como antes do ajuste do 186%). Com subtotal DAX, este caminho não roda.
                 if (comp.value.raw != null && Number.isFinite(comp.value.raw)) {
                     complementSums[i].sum += comp.value.raw;
                     complementSums[i].count += 1;
@@ -569,6 +570,42 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             totalRow.displayTitle = options.totalLabel;
             totalRow.displayMode = options.grandTotalDisplayMode || "both";
             totalRow.isTotal = true;
+
+            // Se o subtotal DAX trouxe o KPI mas omitiu o complemento, preenche o slot
+            // vazio a partir das linhas (comportamento que existia antes do ajuste do 186%).
+            if (sorted.length) {
+                totalRow.cells = totalRow.cells.map((cell, colIndex) => {
+                    const col = columns[colIndex];
+                    if (!col?.complements.length) {
+                        return cell;
+                    }
+                    let changed = false;
+                    const complements = cell.complements.map((comp, i) => {
+                        if (comp.value.raw != null && comp.value.text) {
+                            return comp;
+                        }
+                        let sum = 0;
+                        let count = 0;
+                        for (const row of sorted) {
+                            const rowComp = row.cells[colIndex]?.complements[i];
+                            if (rowComp?.value.raw != null && Number.isFinite(rowComp.value.raw)) {
+                                sum += rowComp.value.raw;
+                                count += 1;
+                            }
+                        }
+                        if (!count) {
+                            return comp;
+                        }
+                        changed = true;
+                        const slot = col.complements[i];
+                        return {
+                            ...comp,
+                            value: formatMeasureValue(sum, slot?.format ?? comp.value.format, formatOpts),
+                        };
+                    });
+                    return changed ? { ...cell, complements } : cell;
+                });
+            }
 
             // Contexto do total primeiro. Se a medida vier em branco (SELECTEDVALUE no total),
             // usa o mesmo SVG que já apareceu na linha da categoria.
