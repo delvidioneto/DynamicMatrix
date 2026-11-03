@@ -28,27 +28,42 @@ function readCfColor(
     return solidColor(readProp(objects, "kpiStyle", propertyName));
 }
 
-/** Cores avaliadas pelo host (fx) em cada interseção da matrix. */
+function firstCfColor(
+    sources: Array<powerbi.DataViewObjects | undefined>,
+    propertyName: string,
+): string | undefined {
+    for (const objects of sources) {
+        const color = readCfColor(objects, propertyName);
+        if (color) {
+            return color;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Cores avaliadas pelo host (fx).
+ * A regra com seletor de categoria chega em `node.objects`.
+ * A cor da medida pode chegar no valor do complemento ou no valor do KPI.
+ * A primeira cor encontrada ganha da cor constante da coluna.
+ */
 export function mergeCellObjectsColors(
     cell: KpiCellData,
     column: KpiColumnConfig,
     valueObjects: powerbi.DataViewObjects | undefined,
+    extraSources: Array<powerbi.DataViewObjects | undefined> = [],
+    complementSources: Array<Array<powerbi.DataViewObjects | undefined> | undefined> = [],
 ): KpiCellData {
-    if (!valueObjects) {
-        return cell;
-    }
+    const shared = [valueObjects, ...extraSources];
+    const primaryFromCf = firstCfColor(shared, "primaryColor");
+    const bgFromCf = firstCfColor(shared, "backgroundColor");
 
-    const primaryFromCf = readCfColor(valueObjects, "primaryColor");
-    const bgFromCf = readCfColor(valueObjects, "backgroundColor");
-
-    const complements = cell.complements.map((comp) => {
+    const complements = cell.complements.map((comp, index) => {
         const i = comp.slotIndex;
-        const fontColor =
-            readCfColor(valueObjects, `complement${i}FontColor`) ?? comp.fontColor;
-        const backColor =
-            readCfColor(valueObjects, `complement${i}BackColor`) ?? comp.backColor;
-        const dataBarColor =
-            readCfColor(valueObjects, `complement${i}DataBarColor`) ?? comp.dataBarColor;
+        const sources = [...(complementSources[index] ?? []), ...shared];
+        const fontColor = firstCfColor(sources, `complement${i}FontColor`) ?? comp.fontColor;
+        const backColor = firstCfColor(sources, `complement${i}BackColor`) ?? comp.backColor;
+        const dataBarColor = firstCfColor(sources, `complement${i}DataBarColor`) ?? comp.dataBarColor;
         return { ...comp, fontColor, backColor, dataBarColor };
     });
 

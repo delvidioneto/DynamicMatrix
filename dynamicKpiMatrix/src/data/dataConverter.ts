@@ -27,6 +27,8 @@ type MatrixValueEntry = {
     objects?: powerbi.DataViewObjects;
 };
 
+type PrimitiveCell = number | string | boolean;
+
 function nodeValue(node: DataViewMatrixNode | undefined): string {
     if (!node) {
         return "";
@@ -45,38 +47,42 @@ function isSubtotalNode(node: DataViewMatrixNode): boolean {
     return Boolean((node as { isSubtotal?: boolean }).isSubtotal);
 }
 
+/**
+ * A chave de `node.values` é o id da interseção da matriz.
+ * A medida certa é `valueSourceIndex`, que pode não coincidir com essa chave.
+ */
+function findValueEntry(
+    node: DataViewMatrixNode | undefined,
+    sourceIndex: number,
+): MatrixValueEntry | undefined {
+    if (!node?.values) {
+        return undefined;
+    }
+    const values = node.values as Record<string | number, MatrixValueEntry | PrimitiveCell>;
+    let keyMatch: MatrixValueEntry | undefined;
+    for (const [key, entry] of Object.entries(values)) {
+        if (entry == null) {
+            continue;
+        }
+        if (typeof entry !== "object") {
+            if (Number(key) === sourceIndex) {
+                return { value: entry };
+            }
+            continue;
+        }
+        if (entry.valueSourceIndex === sourceIndex) {
+            return entry;
+        }
+        if (Number(key) === sourceIndex && entry.valueSourceIndex == null) {
+            keyMatch = entry;
+        }
+    }
+    return keyMatch;
+}
+
 export function readMatrixValue(node: DataViewMatrixNode | undefined, sourceIndex: number): unknown {
-    if (!node) {
-        return null;
-    }
-    const values = node.values as Record<string | number, MatrixValueEntry> | undefined;
-    if (!values) {
-        return null;
-    }
-
-    const direct = values[sourceIndex] ?? values[String(sourceIndex)];
-    if (direct && direct.value !== undefined) {
-        return direct.value;
-    }
-
-    for (const entry of Object.values(values)) {
-        if (entry && entry.valueSourceIndex === sourceIndex && entry.value !== undefined) {
-            return entry.value;
-        }
-    }
-
-    const numericKeys = Object.keys(values)
-        .map((k) => Number(k))
-        .filter((k) => Number.isFinite(k))
-        .sort((a, b) => a - b);
-    if (numericKeys[sourceIndex] != null) {
-        const keyed = values[numericKeys[sourceIndex]] ?? values[String(numericKeys[sourceIndex])];
-        if (keyed && keyed.value !== undefined) {
-            return keyed.value;
-        }
-    }
-
-    return null;
+    const entry = findValueEntry(node, sourceIndex);
+    return entry && entry.value !== undefined ? entry.value : null;
 }
 
 function buildTooltipLines(node: DataViewMatrixNode, tooltipMeasures: MeasureRef[]): TooltipLine[] {
@@ -95,20 +101,7 @@ function readValueObjects(
     node: DataViewMatrixNode | undefined,
     sourceIndex: number,
 ): powerbi.DataViewObjects | undefined {
-    if (!node?.values) {
-        return undefined;
-    }
-    const values = node.values as Record<string | number, MatrixValueEntry>;
-    const direct = values[sourceIndex] ?? values[String(sourceIndex)];
-    if (direct?.objects) {
-        return direct.objects;
-    }
-    for (const entry of Object.values(values)) {
-        if (entry && entry.valueSourceIndex === sourceIndex && entry.objects) {
-            return entry.objects;
-        }
-    }
-    return undefined;
+    return findValueEntry(node, sourceIndex)?.objects;
 }
 
 function buildCell(
@@ -158,7 +151,23 @@ function buildCell(
     };
 
     const valueObjects = readValueObjects(node, column.valueSourceIndex);
-    cell = mergeCellObjectsColors(cell, column, valueObjects);
+    const everyValueObjects = node?.values
+        ? Object.values(node.values as Record<string, MatrixValueEntry>)
+              .map((entry) => entry?.objects)
+              .filter((objects): objects is powerbi.DataViewObjects => Boolean(objects))
+        : [];
+    const complementSources = column.complements.map((slot) => {
+        const measure = measures.find((m) => m.queryName === slot.queryName);
+        const idx = measure?.valueSourceIndex ?? -1;
+        return idx >= 0 ? [readValueObjects(node, idx)] : [];
+    });
+    cell = mergeCellObjectsColors(
+        cell,
+        column,
+        valueObjects,
+        [node?.objects, ...everyValueObjects],
+        complementSources,
+    );
     return applyConditionalColors(cell, column);
 }
 
@@ -300,11 +309,17 @@ function sumTotalFromRows(
             if (!cell) {
                 continue;
             }
-            if (cell.primary.raw != null && Number.isFinite(cell.primary.raw)) {
+            const primaryIsPercent = (col.format ?? "").includes("%");
+            if (!primaryIsPercent && cell.primary.raw != null && Number.isFinite(cell.primary.raw)) {
                 primarySum += cell.primary.raw;
                 primaryCount += 1;
             }
             cell.complements.forEach((comp, i) => {
+                const slotFormat = col.complements[i]?.format ?? "";
+                // Percentual não é aditivo: somar 40% + 53% vira 93% (ou 186% depois da escala).
+                if (slotFormat.includes("%")) {
+                    return;
+                }
                 if (comp.value.raw != null && Number.isFinite(comp.value.raw)) {
                     complementSums[i].sum += comp.value.raw;
                     complementSums[i].count += 1;

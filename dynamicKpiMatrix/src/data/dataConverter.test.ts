@@ -249,6 +249,49 @@ function assert(condition: unknown, message: string): asserts condition {
     });
     assert(view.totalRow, "fallback total exists");
     assert(view.totalRow!.cells[0].primary.raw === 25, `sum primary got ${view.totalRow!.cells[0].primary.raw}`);
+    assert(view.totalRow!.cells[0].complements[0].value.raw == null, "percent complement is not summed");
+}
+
+// Indicador percentual: a chave da célula não é o índice da medida
+{
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    children: [
+                        {
+                            value: "A",
+                            values: {
+                                0: { value: 0.53, valueSourceIndex: 1 },
+                                1: { value: 1.86, valueSourceIndex: 0 },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Billing", roles: { kpis: true }, format: "#,0" },
+                { queryName: "pct", displayName: "Atingimento", roles: { complements: true }, format: "0%" },
+            ],
+        },
+        metadata: {
+            columns: [
+                { queryName: "kpiA", roles: { kpis: true }, objects: { kpiStyle: { complement1: "pct" } } },
+                { queryName: "pct", roles: { complements: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: false,
+    });
+    const comp = view.rows[0].cells[0].complements[0];
+    assert(comp.value.raw === 0.53, `complement raw got ${comp.value.raw}`);
+    assert(comp.value.text.startsWith("53"), `complement text got ${comp.value.text}`);
+    assert(view.rows[0].cells[0].primary.raw === 1.86, "primary stays on its measure");
 }
 
 // Non-additive total proof: average-like values must come from subtotal node, not average of rows
@@ -429,6 +472,68 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(view.totalRow, "total from root values");
     assert(view.totalRow!.iconRaw.includes("id='root-total'"), "total svg from root node");
     assert(view.totalRow!.displayMode === "image", "total image-only mode");
+}
+
+// Cor condicional (fx) vem no objeto da linha, não na célula do KPI
+{
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    children: [
+                        {
+                            value: "A",
+                            objects: {
+                                kpiStyle: {
+                                    complement1FontColor: { solid: { color: "#F5A623" } },
+                                },
+                            },
+                            values: {
+                                0: { value: 10 },
+                                1: { value: 0.07 },
+                            },
+                        },
+                        {
+                            value: "B",
+                            values: {
+                                0: { value: 20 },
+                                1: {
+                                    value: 0.7,
+                                    objects: {
+                                        kpiStyle: {
+                                            complement1FontColor: { solid: { color: "#107C10" } },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Billing", roles: { kpis: true } },
+                { queryName: "pct", displayName: "Hit", roles: { complements: true }, format: "0%" },
+            ],
+        },
+        metadata: {
+            columns: [
+                { queryName: "kpiA", roles: { kpis: true }, objects: { kpiStyle: { complement1: "pct" } } },
+                { queryName: "pct", roles: { complements: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: false,
+    });
+    const rowA = view.rows.find((r) => r.category === "A");
+    const rowB = view.rows.find((r) => r.category === "B");
+    assert(rowA!.cells[0].complements[0].fontColor === "#F5A623", "rule color from row objects");
+    assert(rowA!.cells[0].complements[0].value.text.startsWith("7"), "7% display");
+    assert(rowB!.cells[0].complements[0].fontColor === "#107C10", "rule color from complement value");
 }
 
 // Total Geral: a medida volta em branco no subtotal e o SVG só existe na linha
