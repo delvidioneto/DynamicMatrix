@@ -502,6 +502,82 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(totalCell.complements[1].value.raw === 0.77, "total complement 2 value with string valueSourceIndex");
 }
 
+// Total Geral: chaves de values não são 0..n e sem valueSourceIndex (folha de coluna)
+{
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    children: [
+                        {
+                            isSubtotal: true,
+                            values: {
+                                10: { value: 250 },
+                                11: { value: 0.48 },
+                                12: { value: 0.81 },
+                            },
+                        },
+                        {
+                            value: "A",
+                            values: {
+                                10: { value: 100 },
+                                11: { value: 0.4 },
+                                12: { value: 0.7 },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Delivery", roles: { kpis: true } },
+                {
+                    queryName: "ibp",
+                    displayName: "IBP %",
+                    roles: { complements: true },
+                    format: "0%",
+                },
+                {
+                    queryName: "quota",
+                    displayName: "Quota %",
+                    roles: { complements: true },
+                    format: "0%",
+                },
+            ],
+        },
+        metadata: {
+            columns: [
+                {
+                    queryName: "kpiA",
+                    roles: { kpis: true },
+                    objects: {
+                        kpiStyle: {
+                            complement1: "ibp",
+                            complement2: "quota",
+                            complement1Label: "IBP",
+                            complement2Label: "Quota",
+                        },
+                    },
+                },
+                { queryName: "ibp", roles: { complements: true } },
+                { queryName: "quota", roles: { complements: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total Geral",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: true,
+    });
+    const totalCell = view.totalRow!.cells[0];
+    assert(totalCell.primary.raw === 250, "total primary via ordinal keys");
+    assert(totalCell.complements[0].label === "IBP", "complement title on total");
+    assert(totalCell.complements[0].value.raw === 0.48, "complement 1 value via ordinal keys on total");
+    assert(totalCell.complements[1].value.raw === 0.81, "complement 2 value via ordinal keys on total");
+    assert(view.rows[0].cells[0].complements[0].value.raw === 0.4, "category still works with ordinal keys");
+}
+
 // Indicador percentual: a chave da célula não é o índice da medida
 {
     const dataView = {

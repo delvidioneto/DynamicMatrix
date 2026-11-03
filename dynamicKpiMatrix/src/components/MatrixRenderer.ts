@@ -535,6 +535,9 @@ function renderRow(
     const colRadius = style.columnBorderRadius;
     const catW = colWidthsPx[0] || style.categoryWidth;
 
+    // Só no Total: .dkm-row usa display:contents e ignora min-height do wrapper —
+    // a altura tem de ir para a célula, senão o valor do complemento é cortado.
+    const totalCellMinH = isTotal ? `min-height:${height}px;` : "";
     const cells = columns
         .map((col, i) => {
             const cell = row.cells[i] ?? {
@@ -546,7 +549,7 @@ function renderRow(
             const isLast = i === columns.length - 1;
             const cellW = colWidthsPx[i + 1] || style.columnWidth || 140;
             return (
-                `<div class="dkm-cell dkm-kpi-cell${isLast ? " dkm-cell-last" : ""}">` +
+                `<div class="dkm-cell dkm-kpi-cell${isLast ? " dkm-cell-last" : ""}"${totalCellMinH ? ` style="${totalCellMinH}"` : ""}>` +
                 kpiCellHtml(cell, col, style, cellW) +
                 `</div>`
             );
@@ -554,8 +557,8 @@ function renderRow(
         .join("");
 
     return (
-        `<div class="dkm-row${isTotal ? " dkm-row-total" : ""}" style="--row-bg:${bg};--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${rowRadius}px;--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${colRadius}px;--col-gap:${style.columnGap}px;min-height:${height}px;margin-bottom:${style.rowGap}px">` +
-        `<div class="dkm-cell dkm-cat-cell" style="font-size:${fontSize}px;color:${fontColor};font-weight:${fontWeight};text-align:${align}">${categoryCellHtml(row, style, isTotal, catW)}</div>` +
+        `<div class="dkm-row${isTotal ? " dkm-row-total" : ""}" style="--row-bg:${bg};--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${rowRadius}px;--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${colRadius}px;--col-gap:${style.columnGap}px;${isTotal ? `--row-min-height:${height}px;` : ""}min-height:${height}px;margin-bottom:${style.rowGap}px">` +
+        `<div class="dkm-cell dkm-cat-cell" style="${totalCellMinH}font-size:${fontSize}px;color:${fontColor};font-weight:${fontWeight};text-align:${align}">${categoryCellHtml(row, style, isTotal, catW)}</div>` +
         cells +
         `</div>`
     );

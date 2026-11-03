@@ -90,7 +90,28 @@ function findValueEntry(
 
 export function readMatrixValue(node: DataViewMatrixNode | undefined, sourceIndex: number): unknown {
     const entry = findValueEntry(node, sourceIndex);
-    return entry && entry.value !== undefined ? entry.value : null;
+    if (entry && entry.value !== undefined) {
+        return entry.value;
+    }
+    // Fallback: no Total as chaves de values às vezes são ids de folha da coluna
+    // (não 0..n) e valueSourceIndex vem omitido. Usa a N-ésima entrada ordenada.
+    if (!node?.values || sourceIndex < 0) {
+        return null;
+    }
+    const sorted = Object.entries(node.values as Record<string, MatrixValueEntry | PrimitiveCell>)
+        .filter(([, e]) => e != null)
+        .sort((a, b) => Number(a[0]) - Number(b[0]));
+    const hasExplicitSource = sorted.some(
+        ([, e]) => typeof e === "object" && e != null && (e as MatrixValueEntry).valueSourceIndex != null,
+    );
+    if (hasExplicitSource || sourceIndex >= sorted.length) {
+        return null;
+    }
+    const ordinal = sorted[sourceIndex][1];
+    if (typeof ordinal !== "object") {
+        return ordinal;
+    }
+    return ordinal.value !== undefined ? ordinal.value : null;
 }
 
 /**

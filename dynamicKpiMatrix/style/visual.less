@@ -71,6 +71,20 @@
 .dkm-row-total .dkm-cell {
     font-weight: 700;
     background: var(--row-bg, var(--total-bg, #eef2f6));
+    /* display:contents no .dkm-row ignora min-height da linha — a altura precisa estar na célula.
+       overflow:hidden + altura curta da célula de categoria cortava o valor do complemento
+       (rótulo aparecia, valor sumia) só no Total Geral. */
+    min-height: var(--row-min-height, 0px);
+}
+
+.dkm-row-total .dkm-kpi-cell {
+    overflow: visible;
+}
+
+.dkm-row-total .dkm-kpi {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
 }
 
 .dkm-cat-cell {
