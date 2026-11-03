@@ -144,6 +144,7 @@ function buildCell(
             dataBarColor: slot.dataBarColor,
             icons: slot.icons,
             webUrl: slot.webUrl,
+            fontSize: slot.fontSize,
         };
     });
 

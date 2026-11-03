@@ -26,6 +26,9 @@ function asBool(value: unknown, fallback: boolean): boolean {
 }
 
 export function solidColor(value: unknown): string | undefined {
+    if (typeof value === "string" && value.trim()) {
+        return value.trim();
+    }
     const fill = value as { solid?: { color?: string } } | undefined;
     return fill?.solid?.color;
 }
@@ -126,6 +129,7 @@ function asElementKind(value: unknown): CellElementKind {
 }
 
 function readSlotStyle(styleObjects: DataViewObjects | undefined, i: 1 | 2 | 3 | 4) {
+    const fontSize = asNumber(readProp(styleObjects, "kpiStyle", `complement${i}FontSize`), NaN);
     return {
         fontColor: solidColor(readProp(styleObjects, "kpiStyle", `complement${i}FontColor`)),
         backColor: solidColor(readProp(styleObjects, "kpiStyle", `complement${i}BackColor`)),
@@ -133,6 +137,7 @@ function readSlotStyle(styleObjects: DataViewObjects | undefined, i: 1 | 2 | 3 |
         dataBarColor: solidColor(readProp(styleObjects, "kpiStyle", `complement${i}DataBarColor`)),
         icons: asIconSet(readProp(styleObjects, "kpiStyle", `complement${i}Icons`)),
         webUrl: asText(readProp(styleObjects, "kpiStyle", `complement${i}WebUrl`)),
+        fontSize: Number.isFinite(fontSize) ? fontSize : undefined,
     };
 }
 
@@ -188,6 +193,7 @@ function complementSlots(
             dataBarColor: item.dataBarColor,
             icons: item.icons,
             webUrl: item.webUrl,
+            fontSize: item.fontSize,
         });
     }
     return slots;

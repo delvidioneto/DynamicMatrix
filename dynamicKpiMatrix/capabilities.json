@@ -281,7 +281,7 @@
             }
         },
         "kpiStyle": {
-            "displayName": "Indicadores por KPI",
+            "displayName": "Indicadores",
             "properties": {
                 "title": { "displayName": "Título", "type": { "text": true } },
                 "layout": {
@@ -458,6 +458,10 @@
                 "maxWidth": { "type": { "numeric": true } },
                 "primaryFontSize": { "type": { "numeric": true } },
                 "complementFontSize": { "type": { "numeric": true } },
+                "complement1FontSize": { "displayName": "Tamanho da fonte 1", "type": { "numeric": true } },
+                "complement2FontSize": { "displayName": "Tamanho da fonte 2", "type": { "numeric": true } },
+                "complement3FontSize": { "displayName": "Tamanho da fonte 3", "type": { "numeric": true } },
+                "complement4FontSize": { "displayName": "Tamanho da fonte 4", "type": { "numeric": true } },
                 "labelFontSize": { "type": { "numeric": true } },
                 "primaryColor": { "displayName": "Cor do valor principal", "type": { "fill": { "solid": { "color": true } } } },
                 "primaryColorRule": {

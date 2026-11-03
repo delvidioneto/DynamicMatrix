@@ -11,13 +11,6 @@ const LAYOUT_ITEMS: powerbi.IEnumMember[] = [
     { value: "auto", displayName: "Automático" },
 ];
 
-const SLOT_ITEMS: powerbi.IEnumMember[] = [
-    { value: "1", displayName: "Complemento 1" },
-    { value: "2", displayName: "Complemento 2" },
-    { value: "3", displayName: "Complemento 3" },
-    { value: "4", displayName: "Complemento 4" },
-];
-
 const ICON_ITEMS: powerbi.IEnumMember[] = [
     { value: "none", displayName: "Nenhum" },
     { value: "directional", displayName: "Direcional (setas)" },
@@ -25,26 +18,12 @@ const ICON_ITEMS: powerbi.IEnumMember[] = [
     { value: "triangles", displayName: "Triângulos" },
 ];
 
-const ELEMENT_ITEMS: powerbi.IEnumMember[] = [
-    { value: "font", displayName: "Cor da fonte" },
-    { value: "background", displayName: "Cor de fundo" },
-    { value: "dataBars", displayName: "Barras de dados" },
-    { value: "icons", displayName: "Ícones" },
-    { value: "webUrl", displayName: "URL da web" },
-];
-
 type SlotIndex = 1 | 2 | 3 | 4;
 
-function slotOf(col: KpiColumnConfig): SlotIndex {
-    const n = Number(col.editingComplementSlot ?? 1);
-    if (n === 2 || n === 3 || n === 4) {
-        return n;
-    }
-    return 1;
-}
+const SLOT_INDEXES: SlotIndex[] = [1, 2, 3, 4];
 
 function slotConfig(col: KpiColumnConfig, slot: SlotIndex): ComplementSlot | undefined {
-    return col.complements.find((c) => c.slotIndex === slot) ?? col.complements[slot - 1];
+    return col.complements.find((c) => c.slotIndex === slot);
 }
 
 function textSlice(
@@ -180,75 +159,87 @@ function colorCfSlice(
     };
 }
 
-function buildComplementElementSlices(
+function buildComplementGroup(
     index: number,
     q: string,
     slot: SlotIndex,
     active: ComplementSlot | undefined,
-    elementKind: string,
-): powerbi.visuals.FormattingSlice[] {
+    fallbackFontSize: number,
+    complementItems: powerbi.IEnumMember[],
+): powerbi.visuals.FormattingGroup {
     const prefix = `kpi_${index}_s${slot}`;
-    switch (elementKind) {
-        case "background":
-            return [
-                colorCfSlice(
-                    `${prefix}_bg`,
-                    "Cor de fundo",
-                    `complement${slot}BackColor`,
-                    active?.backColor ?? "#FFFFFF",
-                    q,
-                ),
-            ];
-        case "dataBars":
-            return [
-                toggleSlice(
-                    `${prefix}_bars`,
-                    "Barras de dados",
-                    `complement${slot}DataBars`,
-                    active?.dataBars ?? false,
-                    q,
-                ),
-                colorCfSlice(
-                    `${prefix}_barc`,
-                    "Cor da barra",
-                    `complement${slot}DataBarColor`,
-                    active?.dataBarColor ?? "#118DFF",
-                    q,
-                ),
-            ];
-        case "icons":
-            return [
-                dropdownSlice(
-                    `${prefix}_icons`,
-                    "Ícones",
-                    `complement${slot}Icons`,
-                    active?.icons ?? "none",
-                    ICON_ITEMS,
-                    q,
-                ),
-            ];
-        case "webUrl":
-            return [
-                textSlice(
-                    `${prefix}_url`,
-                    "URL da web",
-                    `complement${slot}WebUrl`,
-                    active?.webUrl ?? "",
-                    q,
-                ),
-            ];
-        case "font":
-        default:
-            return [
-                colorCfSlice(
-                    `${prefix}_fc`,
-                    "Cor da fonte",
-                    `complement${slot}FontColor`,
-                    active?.fontColor ?? "#4A4A4A",
-                    q,
-                ),
-            ];
-    }
+    return {
+        displayName: `Complemento ${slot}`,
+        uid: `kpi_${index}_comp${slot}_uid`,
+        collapsible: true,
+        slices: [
+            dropdownSlice(
+                `${prefix}_measure`,
+                "Medida",
+                `complement${slot}`,
+                active?.queryName || NONE_COMPLEMENT,
+                complementItems,
+                q,
+            ),
+            textSlice(
+                `${prefix}_label`,
+                "Rótulo",
+                `complement${slot}Label`,
+                active?.label ?? "",
+                q,
+            ),
+            numSlice(
+                `${prefix}_fs`,
+                "Tamanho da fonte",
+                `complement${slot}FontSize`,
+                active?.fontSize ?? fallbackFontSize,
+                q,
+            ),
+            colorCfSlice(
+                `${prefix}_fc`,
+                "Cor da fonte",
+                `complement${slot}FontColor`,
+                active?.fontColor ?? "#4A4A4A",
+                q,
+            ),
+            colorCfSlice(
+                `${prefix}_bg`,
+                "Cor de fundo",
+                `complement${slot}BackColor`,
+                active?.backColor ?? "#FFFFFF",
+                q,
+            ),
+            toggleSlice(
+                `${prefix}_bars`,
+                "Barras de dados",
+                `complement${slot}DataBars`,
+                active?.dataBars ?? false,
+                q,
+            ),
+            colorCfSlice(
+                `${prefix}_barc`,
+                "Cor da barra",
+                `complement${slot}DataBarColor`,
+                active?.dataBarColor ?? "#118DFF",
+                q,
+            ),
+            dropdownSlice(
+                `${prefix}_icons`,
+                "Ícones",
+                `complement${slot}Icons`,
+                active?.icons ?? "none",
+                ICON_ITEMS,
+                q,
+            ),
+            textSlice(
+                `${prefix}_url`,
+                "URL da web",
+                `complement${slot}WebUrl`,
+                active?.webUrl ?? "",
+                q,
+            ),
+        ],
+    };
 }
 
 export function buildKpiContainerCard(
@@ -270,9 +261,7 @@ export function buildKpiContainerCard(
             col.layout === "horizontal" || col.layout === "vertical" || col.layout === "auto"
                 ? col.layout
                 : "vertical";
-        const slot = slotOf(col);
-        const active = slotConfig(col, slot);
-        const elementKind = col.editingElementKind || "font";
+        const fallbackFontSize = col.complementFontSize ?? 11;
 
         return {
             displayName: col.title || col.displayName,
@@ -329,65 +318,22 @@ export function buildKpiContainerCard(
                         ),
                     ],
                 },
-                {
-                    displayName: "Complemento",
-                    uid: `kpi_${index}_compGroup_uid`,
-                    collapsible: true,
-                    slices: [
-                        dropdownSlice(
-                            `kpi_${index}_slot`,
-                            "Complemento",
-                            "editingComplementSlot",
-                            String(slot),
-                            SLOT_ITEMS,
-                            q,
-                        ),
-                        dropdownSlice(
-                            `kpi_${index}_measure`,
-                            "Medida",
-                            `complement${slot}`,
-                            active?.queryName || NONE_COMPLEMENT,
-                            complementItems,
-                            q,
-                        ),
-                        textSlice(
-                            `kpi_${index}_label`,
-                            "Rótulo",
-                            `complement${slot}Label`,
-                            active?.label ?? "",
-                            q,
-                        ),
-                        numSlice(
-                            `kpi_${index}_cs`,
-                            "Tamanho da fonte",
-                            "complementFontSize",
-                            col.complementFontSize ?? 11,
-                            q,
-                        ),
-                    ],
-                },
-                {
-                    displayName: "Formatação",
-                    uid: `kpi_${index}_fmtGroup_uid`,
-                    collapsible: true,
-                    slices: [
-                        dropdownSlice(
-                            `kpi_${index}_el`,
-                            "Elemento da célula",
-                            "editingElementKind",
-                            elementKind,
-                            ELEMENT_ITEMS,
-                            q,
-                        ),
-                        ...buildComplementElementSlices(index, q, slot, active, elementKind),
-                    ],
-                },
+                ...SLOT_INDEXES.map((slot) =>
+                    buildComplementGroup(
+                        index,
+                        q,
+                        slot,
+                        slotConfig(col, slot),
+                        fallbackFontSize,
+                        complementItems,
+                    ),
+                ),
             ],
         };
     });
 
     return {
-        displayName: "Indicadores por KPI",
+        displayName: "Indicadores",
         uid: "kpiPerColumnCard_uid",
         groups: [
             {

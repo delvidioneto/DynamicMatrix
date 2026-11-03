@@ -78,6 +78,11 @@ function assert(condition: unknown, message: string): asserts condition {
             complement2: "comp2",
             complement1Label: "IBP",
             complement2Label: "Quota",
+            complement1FontColor: { solid: { color: "#107C10" } },
+            complement2FontColor: { solid: { color: "#D13438" } },
+            complement1FontSize: 13,
+            complement2FontSize: 9,
+            complement2DataBars: true,
         },
     } as powerbi.DataViewObjects);
 
@@ -86,6 +91,12 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(columns[0].title === "Faturamento", "title override");
     assert(columns[0].complements.length === 2, "2 complements mapped");
     assert(columns[0].complements[0].queryName === "comp1", "stable queryName");
+    assert(columns[0].complements[0].fontColor === "#107C10", "complement 1 color");
+    assert(columns[0].complements[0].fontSize === 13, "complement 1 font size");
+    assert(columns[0].complements[1].fontColor === "#D13438", "complement 2 color");
+    assert(columns[0].complements[1].fontSize === 9, "complement 2 font size");
+    assert(columns[0].complements[1].dataBars === true, "complement 2 data bars");
+    assert(columns[0].complements[0].dataBars === false, "complement 1 without bars");
 
     const synced = syncMappingJson(columns);
     assert(synced.includes("comp1"), "sync mapping json");

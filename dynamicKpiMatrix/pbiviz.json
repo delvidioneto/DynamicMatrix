@@ -4,7 +4,7 @@
         "displayName": "Dynamic KPI Matrix",
         "guid": "dynamicKpiMatrix38DD86777BAE45F6A2F7A719D886848F",
         "visualClassName": "Visual",
-        "version": "1.0.0.0",
+        "version": "1.5.0.0",
         "description": "Matriz dinâmica de KPIs com células multi-informação, Total Geral semântico, complementos mapeáveis e tooltips na coluna de categorias.",
         "supportUrl": "https://learn.microsoft.com/power-bi/developer/visuals/overview",
         "gitHubUrl": ""
@@ -22,5 +22,5 @@
     "capabilities": "capabilities.json",
     "dependencies": null,
     "stringResources": [],
-    "version": "1.0.0.0"
+    "version": "1.5.0.0"
 }

@@ -450,7 +450,7 @@ function kpiCellHtml(
                     ? `<span class="dkm-data-bar" style="width:${barPct}%;background:${barColor}"></span>`
                     : "";
             const labelSize = fitLabelFontSize(c.label || c.displayName, baseLabelSize, slotWidth);
-            const valueSize = fitLabelFontSize(c.value.text || "", compSize, slotWidth);
+            const valueSize = fitLabelFontSize(c.value.text || "", c.fontSize ?? compSize, slotWidth);
             return (
                 `<div class="dkm-comp" style="${back}${slotCss}">` +
                 `<span class="dkm-comp-label" style="font-size:${labelSize}px;color:${labelColor}">${esc(c.label || c.displayName)}</span>` +

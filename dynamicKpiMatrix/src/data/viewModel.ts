@@ -25,6 +25,7 @@ export interface ComplementSlot {
     dataBarColor?: string;
     icons?: ComplementIconSet;
     webUrl?: string;
+    fontSize?: number;
 }
 
 export interface KpiColumnConfig {
@@ -86,6 +87,7 @@ export interface ComplementValue {
     dataBarColor?: string;
     icons?: ComplementIconSet;
     webUrl?: string;
+    fontSize?: number;
 }
 
 export interface KpiCellData {

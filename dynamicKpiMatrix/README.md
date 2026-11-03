@@ -45,14 +45,10 @@ A **ordem** das medidas em **Valores** define a ordem das colunas.
 O Power BI não permite wells aninhados “por coluna”. Por isso:
 
 1. Coloque as medidas auxiliares em **Informações complementares**.
-2. Abra **Formato do visual → Indicadores por KPI**.
+2. Abra **Formato do visual → Indicadores**.
 3. Escolha o valor (KPI) no seletor.
-4. Na seção **KPI**: título exibido e orientação dos complementos (vertical / horizontal / automático).
-5. Na seção **Complementos**:
-   - selecione **Complemento 1–4**;
-   - escolha a **medida**;
-   - informe o **rótulo**;
-   - em **Elemento da célula**, configure como na Matrix nativa: cor da fonte, fundo, barras, ícones ou URL (com botão **fx** onde houver formatação condicional de cor).
+4. Em **Coluna** e **Valor principal**, ajuste título, orientação, largura e o valor principal.
+5. Em **Complemento 1**, **Complemento 2**, **Complemento 3** e **Complemento 4**, cada bloco tem a própria medida, rótulo e formatação (tamanho e cor da fonte, fundo, barras, ícones e URL). O que você altera em um complemento não muda os outros.
 
 A associação usa o `queryName` da medida (não a posição no well), então reordenar ou remover outras medidas não “quebra” o mapeamento.
 
@@ -66,7 +62,7 @@ Principais cards no painel **Formato**:
 | **Cabeçalho** | **Texto** e **Fundo** dos títulos das colunas |
 | **Categorias** | **Coluna**, **Texto**, **Ícone** e **Por categoria** (exibição, texto e SVG) |
 | **Valores** | **Texto**, **Número** (unidades e casas decimais) e **Borda** por lado |
-| **Indicadores por KPI** | Por coluna: **Coluna**, **Valor principal**, **Complemento** e **Formatação** |
+| **Indicadores** | Por coluna: **Coluna**, **Valor principal** e **Complemento 1–4** (formatação de cada um) |
 | **Linhas** | **Fundo** (zebra), **Borda** e **Tamanho** |
 | **Colunas** | **Medidas**, **Fundo** e **Borda** |
 | **Total Geral** | **Conteúdo**, **Texto**, **Célula** e **Ícone** |
@@ -120,7 +116,7 @@ A borda envolve o **card interno** (valor principal + complementos), não a grad
 
 ### Formatação condicional nos complementos
 
-No card **Indicadores por KPI → Complementos → Elemento da célula**, as cores de fonte/fundo usam o botão **fx** (regras nativas do Power BI), no espírito dos *Cell elements* da Matrix.
+Em **Indicadores**, dentro de cada **Complemento 1–4**, as cores de fonte, fundo e barra usam o botão **fx** (regras nativas do Power BI). A regra vale só para aquele complemento.
 
 ---
 
@@ -134,7 +130,7 @@ SVG ..................... [Produto SVG], [Total SVG]   // opcional
 Dicas de ferramentas .... [Qtd pedidos]   // opcional
 ```
 
-Depois, em **Indicadores por KPI**, para *Faturamento*: Complemento 1 = IBP, Complemento 2 = Quota, etc.
+Depois, em **Indicadores**, para *Faturamento*: Complemento 1 = IBP, Complemento 2 = Quota, etc.
 
 Exemplos DAX: [dax/examples.dax](dax/examples.dax).
 

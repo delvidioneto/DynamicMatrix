@@ -6,8 +6,8 @@
 2. Arraste medidas para **Valores** (ex.: Billing, Open Orders, Delivery).
 3. Arraste medidas auxiliares para **Informações complementares** (ex.: Billing IBP %, Billing Quota %).
 4. (Opcional) Arraste medidas DAX que retornam código SVG para o well **SVG**.
-5. Abra **Formatar visual → Indicadores por KPI**.
-6. Para cada valor, em **Complemento** escolha até 4 medidas e, em **Formatação**, o elemento da célula (fonte, fundo, barras, ícones, URL).
+5. Abra **Formatar visual → Indicadores**.
+6. Para cada valor, abra **Complemento 1** a **Complemento 4**. Em cada um, escolha a medida e a formatação daquele complemento (fonte, fundo, barras, ícones, URL).
 7. Em **Valores**, ajuste **Texto**, **Número** e **Borda** do bloco valor + complementos.
 
 ## Exemplo de mapeamento
