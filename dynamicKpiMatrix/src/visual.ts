@@ -31,8 +31,18 @@ export class Visual implements IVisual {
     private activeTip: HTMLElement | null = null;
     private lastView: VisualViewModel | null = null;
     private lastPersistedCategoriesJson = "";
+    private lastImagePersistSnapshot = {
+        grandImageUrl: "",
+        grandSvg: "",
+        grandType: "",
+        selectedCategory: "",
+        categoryType: "",
+        categoryImageUrl: "",
+    };
     /** Categoria à qual título/imagem do editor pertencem (evita gravar no KPI errado ao trocar o dropdown). */
     private editorCategoryKey = "";
+    /** Seleção persistida — sobrevive ao populate que limpa o ItemDropdown. */
+    private stickySelectedCategory = "";
 
     constructor(options: VisualConstructorOptions) {
         this.events = options.host.eventService;
@@ -60,15 +70,33 @@ export class Visual implements IVisual {
                     VisualFormattingSettingsModel,
                     dataView,
                 );
+                // Corrige ImageUpload descartado e dropdown sem itens.
+                this.formattingSettings.hydrateFromDataViewObjects(dataView.metadata?.objects);
+            }
+
+            const hydratedSelected = this.formattingSettings.getSelectedCategoryName();
+            if (hydratedSelected) {
+                this.stickySelectedCategory = hydratedSelected;
+            } else if (this.stickySelectedCategory) {
+                this.formattingSettings.ensureSelectedCategoryItem(this.stickySelectedCategory);
             }
 
             this.selectionIds = this.buildSelectionIds(dataView);
             this.syncCategoryEditorState();
+            this.persistImageProperties();
 
             const style = this.formattingSettings.toResolvedStyle();
             const view = convertDataView(dataView, this.formattingSettings.convertOptions());
             this.lastView = view;
-            this.formattingSettings.syncCategoryEditorFromMap(view.categoryNames);
+            this.formattingSettings.syncCategoryEditorFromMap(
+                view.categoryNames,
+                this.stickySelectedCategory,
+            );
+            // Mantém sticky após sync
+            const afterSync = this.formattingSettings.getSelectedCategoryName();
+            if (afterSync) {
+                this.stickySelectedCategory = afterSync;
+            }
 
             // HTML gerado pelo próprio visual (não é input livre do usuário).
             // eslint-disable-next-line powerbi-visuals/no-inner-outer-html
@@ -81,8 +109,14 @@ export class Visual implements IVisual {
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
         if (this.lastView) {
-            this.formattingSettings.syncCategoryEditorFromMap(this.lastView.categoryNames);
+            this.formattingSettings.syncCategoryEditorFromMap(
+                this.lastView.categoryNames,
+                this.stickySelectedCategory,
+            );
         }
+        this.formattingSettings.categoryImages.onPreProcess();
+        this.formattingSettings.grandTotal.onPreProcess();
+        this.formattingSettings.columns.onPreProcess();
         const model = this.formattingSettingsService.buildFormattingModel(this.formattingSettings);
         if (this.lastView?.columns.length) {
             const card = buildKpiContainerCard(this.lastView.columns, this.lastView.complementOptions);
@@ -102,10 +136,18 @@ export class Visual implements IVisual {
     }
 
     private syncCategoryEditorState(): void {
-        const selected = this.formattingSettings.getSelectedCategoryName();
+        const selected = this.formattingSettings.getSelectedCategoryName() || this.stickySelectedCategory;
+        if (selected) {
+            this.formattingSettings.ensureSelectedCategoryItem(selected);
+            this.stickySelectedCategory = selected;
+        }
+
         if (this.editorCategoryKey && this.editorCategoryKey !== selected) {
-            // Dropdown mudou: não mesclar título/imagem antigos na nova categoria.
-            this.formattingSettings.syncCategoryEditorFromMap(this.lastView?.categoryNames ?? []);
+            // Dropdown mudou: carregar título/imagem da nova categoria (não misturar).
+            this.formattingSettings.syncCategoryEditorFromMap(
+                this.lastView?.categoryNames ?? [],
+                selected,
+            );
             this.editorCategoryKey = selected;
             return;
         }
@@ -124,6 +166,7 @@ export class Visual implements IVisual {
                             selector: null as unknown as powerbi.data.Selector,
                             properties: {
                                 categoriesJson: synced,
+                                selectedCategory: selected,
                             },
                         },
                     ],
@@ -131,6 +174,16 @@ export class Visual implements IVisual {
             }
         }
         this.editorCategoryKey = selected;
+    }
+
+    private persistImageProperties(): void {
+        const payload = this.formattingSettings.collectImagePersistProperties(
+            this.lastImagePersistSnapshot,
+        );
+        if (payload.merge && payload.merge.length) {
+            this.lastImagePersistSnapshot = this.formattingSettings.snapshotImagePersistState();
+            this.visualHost.persistProperties(payload);
+        }
     }
 
     private buildSelectionIds(dataView?: powerbi.DataView): ISelectionId[] {

@@ -6,13 +6,23 @@ export type Align = "left" | "center" | "right";
 export type ImagePlacement = "left" | "above";
 export type SortMode = "data" | "alphaAsc" | "alphaDesc" | "kpiAsc" | "kpiDesc";
 export type DisplayMode = "text" | "image" | "both";
+export type ImageSourceType = "png" | "svg";
 export type CfApplyTo = "value" | "background" | "both";
+export type ComplementIconSet = "none" | "directional" | "traffic" | "triangles";
+export type CellElementKind = "font" | "background" | "dataBars" | "icons" | "webUrl";
 
 export interface ComplementSlot {
+    slotIndex: 1 | 2 | 3 | 4;
     queryName: string;
     label: string;
     displayName: string;
     format?: string;
+    fontColor?: string;
+    backColor?: string;
+    dataBars?: boolean;
+    dataBarColor?: string;
+    icons?: ComplementIconSet;
+    webUrl?: string;
 }
 
 export interface KpiColumnConfig {
@@ -21,6 +31,8 @@ export interface KpiColumnConfig {
     title: string;
     layout: CellLayout;
     complements: ComplementSlot[];
+    editingComplementSlot: 1 | 2 | 3 | 4;
+    editingElementKind: CellElementKind;
     widthMode: WidthMode;
     columnWidth: number;
     minWidth: number;
@@ -61,10 +73,17 @@ export interface FormattedValue {
 }
 
 export interface ComplementValue {
+    slotIndex: 1 | 2 | 3 | 4;
     label: string;
     displayName: string;
     queryName: string;
     value: FormattedValue;
+    fontColor?: string;
+    backColor?: string;
+    dataBars?: boolean;
+    dataBarColor?: string;
+    icons?: ComplementIconSet;
+    webUrl?: string;
 }
 
 export interface KpiCellData {
@@ -121,11 +140,13 @@ export interface ResolvedVisualStyle {
     categoryAlignment: Align;
     imageSize: number;
     imagePlacement: ImagePlacement;
+    categoryImageType: ImageSourceType;
     sortMode: SortMode;
     sortKpiQueryName: string;
     grandTotalShow: boolean;
     grandTotalLabel: string;
     grandTotalDisplayMode: DisplayMode;
+    grandTotalImageType: ImageSourceType;
     grandTotalImageData: string;
     grandTotalFontSize: number;
     grandTotalFontColor: string;
@@ -141,11 +162,17 @@ export interface ResolvedVisualStyle {
     rowBorderWidth: number;
     rowBorderRadius: number;
     columnBackground: string;
+    columnShowBorder: boolean;
     columnBorderColor: string;
     columnBorderWidth: number;
     columnBorderRadius: number;
     columnWidth: number;
     columnGap: number;
+    valueFontSize: number;
+    valueFontColor: string;
+    valueAlignment: Align;
+    valueDisplayUnits: number;
+    valuePrecision: number;
     headerFontSize: number;
     headerFontColor: string;
     headerBackground: string;
@@ -173,11 +200,13 @@ export const defaultStyle: ResolvedVisualStyle = {
     categoryAlignment: "left",
     imageSize: 22,
     imagePlacement: "left",
+    categoryImageType: "png",
     sortMode: "data",
     sortKpiQueryName: "",
     grandTotalShow: true,
     grandTotalLabel: "Total Geral",
     grandTotalDisplayMode: "both",
+    grandTotalImageType: "png",
     grandTotalImageData: "",
     grandTotalFontSize: 13,
     grandTotalFontColor: "#111111",
@@ -193,11 +222,17 @@ export const defaultStyle: ResolvedVisualStyle = {
     rowBorderWidth: 1,
     rowBorderRadius: 0,
     columnBackground: "#FFFFFF",
+    columnShowBorder: true,
     columnBorderColor: "#E1E5EA",
     columnBorderWidth: 1,
     columnBorderRadius: 0,
     columnWidth: 140,
     columnGap: 0,
+    valueFontSize: 14,
+    valueFontColor: "#1F1F1F",
+    valueAlignment: "left",
+    valueDisplayUnits: 0,
+    valuePrecision: -1,
     headerFontSize: 11,
     headerFontColor: "#5A5A5A",
     headerBackground: "#FFFFFF",

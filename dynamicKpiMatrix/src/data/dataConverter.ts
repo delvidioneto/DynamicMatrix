@@ -1,7 +1,7 @@
 "use strict";
 
 import powerbi from "powerbi-visuals-api";
-import { formatMeasureValue } from "./formatValue";
+import { formatMeasureValue, ValueFormatOptions } from "./formatValue";
 import { buildKpiColumns, collectMeasures } from "./kpiMapper";
 import { CategoryMetaMap, parseCategoryMetaMap } from "./categoryMeta";
 import {
@@ -14,7 +14,8 @@ import {
     TooltipLine,
     VisualViewModel,
 } from "./viewModel";
-import { applyConditionalColors } from "../services/ConditionalFormatting";
+import { applyConditionalColors, mergeCellObjectsColors } from "../services/ConditionalFormatting";
+import { unwrapMeasureText } from "../services/ImageManager";
 
 import DataView = powerbi.DataView;
 import DataViewMatrixNode = powerbi.DataViewMatrixNode;
@@ -22,6 +23,7 @@ import DataViewMatrixNode = powerbi.DataViewMatrixNode;
 type MatrixValueEntry = {
     value?: unknown;
     valueSourceIndex?: number;
+    objects?: powerbi.DataViewObjects;
 };
 
 function nodeValue(node: DataViewMatrixNode | undefined): string {
@@ -88,17 +90,38 @@ function buildTooltipLines(node: DataViewMatrixNode, tooltipMeasures: MeasureRef
         .filter((line) => line.value !== "");
 }
 
+function readValueObjects(
+    node: DataViewMatrixNode | undefined,
+    sourceIndex: number,
+): powerbi.DataViewObjects | undefined {
+    if (!node?.values) {
+        return undefined;
+    }
+    const values = node.values as Record<string | number, MatrixValueEntry>;
+    const direct = values[sourceIndex] ?? values[String(sourceIndex)];
+    if (direct?.objects) {
+        return direct.objects;
+    }
+    for (const entry of Object.values(values)) {
+        if (entry && entry.valueSourceIndex === sourceIndex && entry.objects) {
+            return entry.objects;
+        }
+    }
+    return undefined;
+}
+
 function buildCell(
     node: DataViewMatrixNode | undefined,
     column: KpiColumnConfig,
     measures: MeasureRef[],
+    formatOpts?: ValueFormatOptions,
     rawOverride?: { primary?: number | null; complements?: Array<number | null> },
 ): KpiCellData {
     const primaryRaw =
         rawOverride?.primary !== undefined
             ? rawOverride.primary
             : (readMatrixValue(node, column.valueSourceIndex) as number | null);
-    const primary = formatMeasureValue(primaryRaw, column.format);
+    const primary = formatMeasureValue(primaryRaw, column.format, formatOpts);
     const complements: ComplementValue[] = column.complements.map((slot, i) => {
         const measure = measures.find((m) => m.queryName === slot.queryName);
         const idx = measure?.valueSourceIndex ?? -1;
@@ -109,14 +132,21 @@ function buildCell(
                   ? readMatrixValue(node, idx)
                   : null;
         return {
+            slotIndex: slot.slotIndex,
             label: slot.label,
             displayName: slot.displayName,
             queryName: slot.queryName,
-            value: formatMeasureValue(raw, slot.format ?? measure?.format),
+            value: formatMeasureValue(raw, slot.format ?? measure?.format, formatOpts),
+            fontColor: slot.fontColor,
+            backColor: slot.backColor,
+            dataBars: slot.dataBars,
+            dataBarColor: slot.dataBarColor,
+            icons: slot.icons,
+            webUrl: slot.webUrl,
         };
     });
 
-    const cell: KpiCellData = {
+    let cell: KpiCellData = {
         queryName: column.queryName,
         primary,
         complements,
@@ -124,6 +154,9 @@ function buildCell(
         backgroundColor: column.backgroundColor,
         primaryColor: column.primaryColor,
     };
+
+    const valueObjects = readValueObjects(node, column.valueSourceIndex);
+    cell = mergeCellObjectsColors(cell, column, valueObjects);
     return applyConditionalColors(cell, column);
 }
 
@@ -134,13 +167,14 @@ function toRow(
     measures: MeasureRef[],
     metaMap: CategoryMetaMap,
     totalLabel: string,
+    formatOpts?: ValueFormatOptions,
 ): MatrixRow {
     const isTotal = isSubtotalNode(node);
     const category = isTotal ? totalLabel : nodeValue(node);
     const meta = metaMap[category];
     const iconMeasure = measures.find((m) => m.role === "categoryIcon");
     const iconRaw = iconMeasure
-        ? String(readMatrixValue(node, iconMeasure.valueSourceIndex) ?? "")
+        ? unwrapMeasureText(String(readMatrixValue(node, iconMeasure.valueSourceIndex) ?? ""))
         : "";
     const tooltips = measures.filter((m) => m.role === "tooltips");
     const customTitle = meta?.title?.trim();
@@ -153,7 +187,7 @@ function toRow(
         iconPersisted: meta?.imageUrl,
         isTotal,
         sourceIndex: index,
-        cells: columns.map((col) => buildCell(node, col, measures)),
+        cells: columns.map((col) => buildCell(node, col, measures, formatOpts)),
         tooltips: buildTooltipLines(node, tooltips),
     };
 }
@@ -170,6 +204,7 @@ function sumTotalFromRows(
     columns: KpiColumnConfig[],
     measures: MeasureRef[],
     totalLabel: string,
+    formatOpts?: ValueFormatOptions,
 ): MatrixRow {
     const cells = columns.map((col) => {
         let primarySum = 0;
@@ -193,10 +228,16 @@ function sumTotalFromRows(
             });
         }
 
-        return buildCell(undefined, col, measures, {
-            primary: primaryCount ? primarySum : null,
-            complements: complementSums.map((c) => (c.count ? c.sum : null)),
-        });
+        return buildCell(
+            undefined,
+            col,
+            measures,
+            formatOpts,
+            {
+                primary: primaryCount ? primarySum : null,
+                complements: complementSums.map((c) => (c.count ? c.sum : null)),
+            },
+        );
     });
 
     return {
@@ -251,6 +292,8 @@ export interface ConvertOptions {
     categoriesJson: string;
     imagesJson?: string;
     showTotal: boolean;
+    displayUnits?: number;
+    precision?: number;
 }
 
 export function convertDataView(dataView: DataView | undefined, options: ConvertOptions): VisualViewModel {
@@ -260,7 +303,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             rows: [],
             complementOptions: [],
             categoryNames: [],
-            emptyMessage: "Adicione uma categoria e ao menos um KPI principal.",
+            emptyMessage: "Adicione uma categoria e ao menos um valor.",
         };
     }
 
@@ -273,6 +316,10 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
         columnObjectsMap(dataView),
     );
     const metaMap = parseCategoryMetaMap(options.categoriesJson, options.imagesJson);
+    const formatOpts: ValueFormatOptions = {
+        displayUnits: options.displayUnits,
+        precision: options.precision,
+    };
     const root = matrix.rows?.root;
     const rootChildren = root?.children ?? [];
 
@@ -280,7 +327,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
     const dataNodes = rootChildren.filter((n) => !isSubtotalNode(n));
 
     const dataRows = dataNodes.map((node, i) =>
-        toRow(node, i, columns, measures, metaMap, options.totalLabel),
+        toRow(node, i, columns, measures, metaMap, options.totalLabel, formatOpts),
     );
     const sorted = sortRows(dataRows, options.sortMode, options.sortKpiQueryName);
 
@@ -288,13 +335,13 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
     if (options.showTotal) {
         const subtotalNode = totalNodes.find((n) => nodeHasAnyValue(n, columns)) ?? totalNodes[0];
         if (subtotalNode && nodeHasAnyValue(subtotalNode, columns)) {
-            totalRow = toRow(subtotalNode, -1, columns, measures, metaMap, options.totalLabel);
+            totalRow = toRow(subtotalNode, -1, columns, measures, metaMap, options.totalLabel, formatOpts);
         } else if (root && nodeHasAnyValue(root, columns)) {
-            totalRow = toRow(root, -1, columns, measures, metaMap, options.totalLabel);
+            totalRow = toRow(root, -1, columns, measures, metaMap, options.totalLabel, formatOpts);
             totalRow.isTotal = true;
         } else if (sorted.length) {
             // Fallback: soma das linhas visíveis (quando o host não envia subtotal DAX).
-            totalRow = sumTotalFromRows(sorted, columns, measures, options.totalLabel);
+            totalRow = sumTotalFromRows(sorted, columns, measures, options.totalLabel, formatOpts);
         }
 
         if (totalRow) {
@@ -316,7 +363,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             totalRow,
             complementOptions,
             categoryNames: sorted.map((r) => r.category),
-            emptyMessage: "Adicione medidas ao campo KPIs principais.",
+            emptyMessage: "Adicione medidas ao campo Valores.",
         };
     }
 

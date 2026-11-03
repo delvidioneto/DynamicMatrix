@@ -2,6 +2,8 @@
 
 import powerbi from "powerbi-visuals-api";
 import {
+    CellElementKind,
+    ComplementIconSet,
     ComplementSlot,
     defaultKpiStyle,
     KpiColumnConfig,
@@ -23,12 +25,16 @@ function asBool(value: unknown, fallback: boolean): boolean {
     return typeof value === "boolean" ? value : fallback;
 }
 
-function solidColor(value: unknown): string | undefined {
+export function solidColor(value: unknown): string | undefined {
     const fill = value as { solid?: { color?: string } } | undefined;
     return fill?.solid?.color;
 }
 
-function readProp<T>(objects: DataViewObjects | undefined, objectName: string, propertyName: string): T | undefined {
+export function readProp<T>(
+    objects: DataViewObjects | undefined,
+    objectName: string,
+    propertyName: string,
+): T | undefined {
     const obj = objects?.[objectName] as Record<string, unknown> | undefined;
     return obj?.[propertyName] as T | undefined;
 }
@@ -95,6 +101,41 @@ function normalizeComplementQueryName(raw: string): string {
     return q;
 }
 
+function asSlotIndex(value: unknown): 1 | 2 | 3 | 4 {
+    const n = Number(value);
+    if (n === 2 || n === 3 || n === 4) {
+        return n;
+    }
+    return 1;
+}
+
+function asIconSet(value: unknown): ComplementIconSet {
+    const v = asText(value, "none");
+    if (v === "directional" || v === "traffic" || v === "triangles") {
+        return v;
+    }
+    return "none";
+}
+
+function asElementKind(value: unknown): CellElementKind {
+    const v = asText(value, "font");
+    if (v === "background" || v === "dataBars" || v === "icons" || v === "webUrl") {
+        return v;
+    }
+    return "font";
+}
+
+function readSlotStyle(styleObjects: DataViewObjects | undefined, i: 1 | 2 | 3 | 4) {
+    return {
+        fontColor: solidColor(readProp(styleObjects, "kpiStyle", `complement${i}FontColor`)),
+        backColor: solidColor(readProp(styleObjects, "kpiStyle", `complement${i}BackColor`)),
+        dataBars: asBool(readProp(styleObjects, "kpiStyle", `complement${i}DataBars`), false),
+        dataBarColor: solidColor(readProp(styleObjects, "kpiStyle", `complement${i}DataBarColor`)),
+        icons: asIconSet(readProp(styleObjects, "kpiStyle", `complement${i}Icons`)),
+        webUrl: asText(readProp(styleObjects, "kpiStyle", `complement${i}WebUrl`)),
+    };
+}
+
 function complementSlots(
     styleObjects: DataViewObjects | undefined,
     mappingEntry: { complements?: string[] } | undefined,
@@ -102,41 +143,51 @@ function complementSlots(
 ): ComplementSlot[] {
     const byQuery = new Map(complements.map((c) => [c.queryName, c]));
     const kpiStyle = styleObjects?.kpiStyle as Record<string, unknown> | undefined;
-    // Se o KPI já tem kpiStyle (mesmo com complementos vazios), não voltar ao JSON antigo.
     const hasExplicitKpiStyle = Boolean(kpiStyle);
 
-    const fromObjects = [1, 2, 3, 4]
-        .map((i) => {
-            const q = normalizeComplementQueryName(
-                asText(readProp(styleObjects, "kpiStyle", `complement${i}`)),
-            );
-            const label = asText(readProp(styleObjects, "kpiStyle", `complement${i}Label`));
-            return { queryName: q, label };
-        })
-        .filter((slot) => slot.queryName);
+    const fromObjects = ([1, 2, 3, 4] as const).map((i) => {
+        const q = normalizeComplementQueryName(
+            asText(readProp(styleObjects, "kpiStyle", `complement${i}`)),
+        );
+        const label = asText(readProp(styleObjects, "kpiStyle", `complement${i}Label`));
+        return { slotIndex: i, queryName: q, label, ...readSlotStyle(styleObjects, i) };
+    });
 
     const fromJson = (mappingEntry?.complements ?? [])
-        .map((queryName) => normalizeComplementQueryName(queryName))
-        .filter(Boolean)
-        .map((queryName) => ({ queryName, label: "" }));
+        .map((queryName, idx) => ({
+            slotIndex: (Math.min(idx + 1, 4) as 1 | 2 | 3 | 4),
+            queryName: normalizeComplementQueryName(queryName),
+            label: "",
+            ...readSlotStyle(undefined, (Math.min(idx + 1, 4) as 1 | 2 | 3 | 4)),
+        }))
+        .filter((slot) => slot.queryName);
 
-    const combined = (hasExplicitKpiStyle ? fromObjects : fromObjects.length ? fromObjects : fromJson).slice(
-        0,
-        4,
-    );
+    const source = hasExplicitKpiStyle
+        ? fromObjects.filter((s) => s.queryName)
+        : fromObjects.some((s) => s.queryName)
+          ? fromObjects.filter((s) => s.queryName)
+          : fromJson;
+
     const seen = new Set<string>();
     const slots: ComplementSlot[] = [];
-    for (const item of combined) {
+    for (const item of source.slice(0, 4)) {
         if (seen.has(item.queryName) || !byQuery.has(item.queryName)) {
             continue;
         }
         seen.add(item.queryName);
         const measure = byQuery.get(item.queryName)!;
         slots.push({
+            slotIndex: item.slotIndex,
             queryName: measure.queryName,
             displayName: measure.displayName,
             label: item.label || measure.displayName,
             format: measure.format,
+            fontColor: item.fontColor,
+            backColor: item.backColor,
+            dataBars: item.dataBars,
+            dataBarColor: item.dataBarColor,
+            icons: item.icons,
+            webUrl: item.webUrl,
         });
     }
     return slots;
@@ -168,6 +219,8 @@ export function buildKpiColumns(
             title,
             layout,
             complements: complementSlots(objects, mappingEntry, complements),
+            editingComplementSlot: asSlotIndex(readProp(objects, "kpiStyle", "editingComplementSlot")),
+            editingElementKind: asElementKind(readProp(objects, "kpiStyle", "editingElementKind")),
             widthMode,
             columnWidth: asNumber(readProp(objects, "kpiStyle", "columnWidth"), defaultKpiStyle.columnWidth),
             minWidth: asNumber(readProp(objects, "kpiStyle", "minWidth"), defaultKpiStyle.minWidth),

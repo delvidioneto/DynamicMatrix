@@ -37,5 +37,5 @@ export function estimateDataUriBytes(dataUri: string): number {
     return Math.floor((b64.length * 3) / 4);
 }
 
-/** Limite prático para persistência em objects do visual (~24KB). */
-export const MAX_PERSISTED_IMAGE_BYTES = 24 * 1024;
+/** Limite prático para persistência em objects do visual (~200KB). */
+export const MAX_PERSISTED_IMAGE_BYTES = 200 * 1024;

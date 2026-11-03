@@ -1,7 +1,7 @@
 "use strict";
 
 import { convertDataView } from "./dataConverter";
-import { formatMeasureValue, normalizeCfRatio } from "./formatValue";
+import { DisplayUnits, formatMeasureValue, normalizeCfRatio } from "./formatValue";
 import { buildKpiColumns, collectMeasures, parseMappingJson, syncMappingJson } from "./kpiMapper";
 import { parseCategoryMetaMap, upsertCategoryMeta } from "./categoryMeta";
 import { applyConditionalColors } from "../services/ConditionalFormatting";
@@ -27,6 +27,13 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(blank.text === "", "blank should be empty");
     assert(normalizeCfRatio(1.02, true) === 1.02, "ratio decimal");
     assert(normalizeCfRatio(102, true) === 1.02, "ratio points");
+    const none = formatMeasureValue(1_500_000, undefined, { displayUnits: DisplayUnits.None });
+    assert(none.text.includes("1") && none.text.includes("500"), `none units got ${none.text}`);
+    const millions = formatMeasureValue(1_500_000, undefined, {
+        displayUnits: DisplayUnits.Millions,
+        precision: 1,
+    });
+    assert(millions.text.includes("M"), `millions got ${millions.text}`);
 }
 
 // --- svg sanitize ---
@@ -36,10 +43,12 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(!clean.includes("script"), "script removed");
     assert(!clean.toLowerCase().includes("onclick"), "onclick removed");
     assert(isDataImageUri("data:image/png;base64,aaa"), "png uri");
-    const bad = validatePersistedImage("data:image/png;base64," + "a".repeat(50_000));
+    const bad = validatePersistedImage("data:image/png;base64," + "a".repeat(400_000));
     assert(!bad.ok, "large image rejected");
     const svgImg = resolveImageSource("<svg><circle r='1'/></svg>");
     assert(svgImg.kind === "svg", "svg resolved");
+    const quoted = resolveImageSource('"<svg><rect width=\'1\' height=\'1\'/></svg>"');
+    assert(quoted.kind === "svg", "quoted svg from measure resolved");
 }
 
 // --- kpiMapper ---
@@ -90,6 +99,8 @@ function assert(condition: unknown, message: string): asserts condition {
         title: "Billing",
         layout: "auto",
         complements: [],
+        editingComplementSlot: 1,
+        editingElementKind: "font",
         widthMode: "auto",
         columnWidth: 140,
         minWidth: 96,
@@ -270,7 +281,9 @@ function assert(condition: unknown, message: string): asserts condition {
                     displayName: "Billing",
                     title: "Billing",
                     layout: "vertical",
-                    complements: [{ queryName: "c1", label: "IBP", displayName: "IBP" }],
+                    complements: [{ slotIndex: 1, queryName: "c1", label: "IBP", displayName: "IBP" }],
+                    editingComplementSlot: 1,
+                    editingElementKind: "font",
                     widthMode: "auto",
                     columnWidth: 140,
                     minWidth: 96,
@@ -301,6 +314,7 @@ function assert(condition: unknown, message: string): asserts condition {
                             primary: { raw: 40, text: "$40" },
                             complements: [
                                 {
+                                    slotIndex: 1,
                                     label: "IBP",
                                     displayName: "IBP",
                                     queryName: "c1",

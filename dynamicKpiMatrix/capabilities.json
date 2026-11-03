@@ -7,14 +7,14 @@
             "kind": "Grouping"
         },
         {
-            "displayName": "KPIs principais",
+            "displayName": "Valores",
             "description": "Medidas DAX que criam colunas da matriz. Ordem = ordem das colunas.",
             "name": "kpis",
             "kind": "Measure"
         },
         {
             "displayName": "Informações complementares",
-            "description": "Medidas auxiliares. Associe até 4 por KPI no painel de formatação.",
+            "description": "Medidas auxiliares. Associe até 4 por valor no painel de formatação.",
             "name": "complements",
             "kind": "Measure"
         },
@@ -106,7 +106,18 @@
                 "imagesJson": { "type": { "text": true } },
                 "selectedCategory": { "type": { "text": true } },
                 "categoryTitle": { "type": { "text": true } },
-                "imageData": { "type": { "text": true } }
+                "imageType": {
+                    "displayName": "Tipo de imagem",
+                    "type": {
+                        "enumeration": [
+                            { "value": "png", "displayName": "PNG (upload)" },
+                            { "value": "svg", "displayName": "SVG (medida/texto)" }
+                        ]
+                    }
+                },
+                "imageData": { "type": { "text": true } },
+                "imageUrl": { "type": { "text": true } },
+                "svgMarkup": { "type": { "text": true } }
             }
         },
         "grandTotal": {
@@ -122,7 +133,18 @@
                         ]
                     }
                 },
+                "imageType": {
+                    "displayName": "Tipo de imagem",
+                    "type": {
+                        "enumeration": [
+                            { "value": "png", "displayName": "PNG (upload)" },
+                            { "value": "svg", "displayName": "SVG (medida/texto)" }
+                        ]
+                    }
+                },
                 "imageData": { "type": { "text": true } },
+                "imageUrl": { "type": { "text": true } },
+                "svgMarkup": { "type": { "text": true } },
                 "fontSize": { "type": { "numeric": true } },
                 "fontColor": { "type": { "fill": { "solid": { "color": true } } } },
                 "background": { "type": { "fill": { "solid": { "color": true } } } },
@@ -155,11 +177,41 @@
         "columns": {
             "properties": {
                 "background": { "type": { "fill": { "solid": { "color": true } } } },
+                "showBorder": { "type": { "bool": true } },
                 "borderColor": { "type": { "fill": { "solid": { "color": true } } } },
                 "borderWidth": { "type": { "numeric": true } },
                 "borderRadius": { "type": { "numeric": true } },
                 "columnWidth": { "type": { "numeric": true } },
                 "columnGap": { "type": { "numeric": true } }
+            }
+        },
+        "values": {
+            "displayName": "Valores",
+            "properties": {
+                "fontSize": { "displayName": "Tamanho do texto", "type": { "numeric": true } },
+                "fontColor": { "displayName": "Cor do texto", "type": { "fill": { "solid": { "color": true } } } },
+                "alignment": {
+                    "displayName": "Alinhamento",
+                    "type": {
+                        "enumeration": [
+                            { "value": "left", "displayName": "Esquerda" },
+                            { "value": "center", "displayName": "Centro" },
+                            { "value": "right", "displayName": "Direita" }
+                        ]
+                    }
+                },
+                "displayUnits": {
+                    "displayName": "Unidades de exibição",
+                    "type": {
+                        "formatting": {
+                            "labelDisplayUnits": true
+                        }
+                    }
+                },
+                "precision": {
+                    "displayName": "Casas decimais",
+                    "type": { "numeric": true }
+                }
             }
         },
         "header": {
@@ -179,9 +231,11 @@
             }
         },
         "kpiStyle": {
+            "displayName": "Indicadores por KPI",
             "properties": {
-                "title": { "type": { "text": true } },
+                "title": { "displayName": "Título", "type": { "text": true } },
                 "layout": {
+                    "displayName": "Orientação dos complementos",
                     "type": {
                         "enumeration": [
                             { "value": "auto", "displayName": "Automático" },
@@ -190,14 +244,157 @@
                         ]
                     }
                 },
-                "complement1": { "type": { "text": true } },
-                "complement2": { "type": { "text": true } },
-                "complement3": { "type": { "text": true } },
-                "complement4": { "type": { "text": true } },
-                "complement1Label": { "type": { "text": true } },
-                "complement2Label": { "type": { "text": true } },
-                "complement3Label": { "type": { "text": true } },
-                "complement4Label": { "type": { "text": true } },
+                "editingComplementSlot": {
+                    "displayName": "Complemento",
+                    "type": {
+                        "enumeration": [
+                            { "value": "1", "displayName": "Complemento 1" },
+                            { "value": "2", "displayName": "Complemento 2" },
+                            { "value": "3", "displayName": "Complemento 3" },
+                            { "value": "4", "displayName": "Complemento 4" }
+                        ]
+                    }
+                },
+                "editingElementKind": {
+                    "displayName": "Elemento da célula",
+                    "type": {
+                        "enumeration": [
+                            { "value": "font", "displayName": "Cor da fonte" },
+                            { "value": "background", "displayName": "Cor de fundo" },
+                            { "value": "dataBars", "displayName": "Barras de dados" },
+                            { "value": "icons", "displayName": "Ícones" },
+                            { "value": "webUrl", "displayName": "URL da web" }
+                        ]
+                    }
+                },
+                "complement1": { "displayName": "Medida (complemento 1)", "type": { "text": true } },
+                "complement2": { "displayName": "Medida (complemento 2)", "type": { "text": true } },
+                "complement3": { "displayName": "Medida (complemento 3)", "type": { "text": true } },
+                "complement4": { "displayName": "Medida (complemento 4)", "type": { "text": true } },
+                "complement1Label": { "displayName": "Rótulo 1", "type": { "text": true } },
+                "complement2Label": { "displayName": "Rótulo 2", "type": { "text": true } },
+                "complement3Label": { "displayName": "Rótulo 3", "type": { "text": true } },
+                "complement4Label": { "displayName": "Rótulo 4", "type": { "text": true } },
+                "complement1FontColor": { "displayName": "Cor da fonte 1", "type": { "fill": { "solid": { "color": true } } } },
+                "complement2FontColor": { "displayName": "Cor da fonte 2", "type": { "fill": { "solid": { "color": true } } } },
+                "complement3FontColor": { "displayName": "Cor da fonte 3", "type": { "fill": { "solid": { "color": true } } } },
+                "complement4FontColor": { "displayName": "Cor da fonte 4", "type": { "fill": { "solid": { "color": true } } } },
+                "complement1FontColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement1FontColor", "selector": ["category"] }
+                    }
+                },
+                "complement2FontColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement2FontColor", "selector": ["category"] }
+                    }
+                },
+                "complement3FontColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement3FontColor", "selector": ["category"] }
+                    }
+                },
+                "complement4FontColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement4FontColor", "selector": ["category"] }
+                    }
+                },
+                "complement1BackColor": { "displayName": "Cor de fundo 1", "type": { "fill": { "solid": { "color": true } } } },
+                "complement2BackColor": { "displayName": "Cor de fundo 2", "type": { "fill": { "solid": { "color": true } } } },
+                "complement3BackColor": { "displayName": "Cor de fundo 3", "type": { "fill": { "solid": { "color": true } } } },
+                "complement4BackColor": { "displayName": "Cor de fundo 4", "type": { "fill": { "solid": { "color": true } } } },
+                "complement1BackColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement1BackColor", "selector": ["category"] }
+                    }
+                },
+                "complement2BackColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement2BackColor", "selector": ["category"] }
+                    }
+                },
+                "complement3BackColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement3BackColor", "selector": ["category"] }
+                    }
+                },
+                "complement4BackColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement4BackColor", "selector": ["category"] }
+                    }
+                },
+                "complement1DataBars": { "displayName": "Barras de dados 1", "type": { "bool": true } },
+                "complement2DataBars": { "displayName": "Barras de dados 2", "type": { "bool": true } },
+                "complement3DataBars": { "displayName": "Barras de dados 3", "type": { "bool": true } },
+                "complement4DataBars": { "displayName": "Barras de dados 4", "type": { "bool": true } },
+                "complement1DataBarColor": { "displayName": "Cor da barra 1", "type": { "fill": { "solid": { "color": true } } } },
+                "complement2DataBarColor": { "displayName": "Cor da barra 2", "type": { "fill": { "solid": { "color": true } } } },
+                "complement3DataBarColor": { "displayName": "Cor da barra 3", "type": { "fill": { "solid": { "color": true } } } },
+                "complement4DataBarColor": { "displayName": "Cor da barra 4", "type": { "fill": { "solid": { "color": true } } } },
+                "complement1Icons": {
+                    "displayName": "Ícones 1",
+                    "type": {
+                        "enumeration": [
+                            { "value": "none", "displayName": "Nenhum" },
+                            { "value": "directional", "displayName": "Direcional (setas)" },
+                            { "value": "traffic", "displayName": "Semáforo" },
+                            { "value": "triangles", "displayName": "Triângulos" }
+                        ]
+                    }
+                },
+                "complement2Icons": {
+                    "displayName": "Ícones 2",
+                    "type": {
+                        "enumeration": [
+                            { "value": "none", "displayName": "Nenhum" },
+                            { "value": "directional", "displayName": "Direcional (setas)" },
+                            { "value": "traffic", "displayName": "Semáforo" },
+                            { "value": "triangles", "displayName": "Triângulos" }
+                        ]
+                    }
+                },
+                "complement3Icons": {
+                    "displayName": "Ícones 3",
+                    "type": {
+                        "enumeration": [
+                            { "value": "none", "displayName": "Nenhum" },
+                            { "value": "directional", "displayName": "Direcional (setas)" },
+                            { "value": "traffic", "displayName": "Semáforo" },
+                            { "value": "triangles", "displayName": "Triângulos" }
+                        ]
+                    }
+                },
+                "complement4Icons": {
+                    "displayName": "Ícones 4",
+                    "type": {
+                        "enumeration": [
+                            { "value": "none", "displayName": "Nenhum" },
+                            { "value": "directional", "displayName": "Direcional (setas)" },
+                            { "value": "traffic", "displayName": "Semáforo" },
+                            { "value": "triangles", "displayName": "Triângulos" }
+                        ]
+                    }
+                },
+                "complement1WebUrl": { "displayName": "URL da web 1", "type": { "text": true } },
+                "complement2WebUrl": { "displayName": "URL da web 2", "type": { "text": true } },
+                "complement3WebUrl": { "displayName": "URL da web 3", "type": { "text": true } },
+                "complement4WebUrl": { "displayName": "URL da web 4", "type": { "text": true } },
                 "columnWidth": { "type": { "numeric": true } },
                 "widthMode": {
                     "type": {
@@ -212,11 +409,25 @@
                 "primaryFontSize": { "type": { "numeric": true } },
                 "complementFontSize": { "type": { "numeric": true } },
                 "labelFontSize": { "type": { "numeric": true } },
-                "primaryColor": { "type": { "fill": { "solid": { "color": true } } } },
+                "primaryColor": { "displayName": "Cor do valor principal", "type": { "fill": { "solid": { "color": true } } } },
+                "primaryColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "kpis",
+                        "output": { "property": "primaryColor", "selector": ["category"] }
+                    }
+                },
                 "complementColor": { "type": { "fill": { "solid": { "color": true } } } },
                 "labelColor": { "type": { "fill": { "solid": { "color": true } } } },
                 "headerColor": { "type": { "fill": { "solid": { "color": true } } } },
-                "backgroundColor": { "type": { "fill": { "solid": { "color": true } } } },
+                "backgroundColor": { "displayName": "Fundo da célula", "type": { "fill": { "solid": { "color": true } } } },
+                "backgroundColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "kpis",
+                        "output": { "property": "backgroundColor", "selector": ["category"] }
+                    }
+                },
                 "cellPadding": { "type": { "numeric": true } },
                 "cfEnabled": { "type": { "bool": true } },
                 "cfApplyTo": {
