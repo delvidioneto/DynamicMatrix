@@ -50,6 +50,9 @@ function isSubtotalNode(node: DataViewMatrixNode): boolean {
 /**
  * A chave de `node.values` é o id da interseção da matriz.
  * A medida certa é `valueSourceIndex`, que pode não coincidir com essa chave.
+ * No nó de Total o host às vezes envia `valueSourceIndex` como string ("1");
+ * comparação estrita com number falhava e o complemento ficava sem valor
+ * (rótulo da config aparecia, valor em branco).
  */
 function findValueEntry(
     node: DataViewMatrixNode | undefined,
@@ -59,6 +62,7 @@ function findValueEntry(
         return undefined;
     }
     const values = node.values as Record<string | number, MatrixValueEntry | PrimitiveCell>;
+    let sourceMatch: MatrixValueEntry | undefined;
     let keyMatch: MatrixValueEntry | undefined;
     for (const [key, entry] of Object.entries(values)) {
         if (entry == null) {
@@ -70,14 +74,18 @@ function findValueEntry(
             }
             continue;
         }
-        if (entry.valueSourceIndex === sourceIndex) {
-            return entry;
+        if (
+            entry.valueSourceIndex != null &&
+            Number(entry.valueSourceIndex) === sourceIndex &&
+            !sourceMatch
+        ) {
+            sourceMatch = entry;
         }
-        if (Number(key) === sourceIndex && entry.valueSourceIndex == null) {
+        if (Number(key) === sourceIndex && !keyMatch) {
             keyMatch = entry;
         }
     }
-    return keyMatch;
+    return sourceMatch ?? keyMatch;
 }
 
 export function readMatrixValue(node: DataViewMatrixNode | undefined, sourceIndex: number): unknown {
@@ -86,33 +94,43 @@ export function readMatrixValue(node: DataViewMatrixNode | undefined, sourceInde
 }
 
 /**
- * No Total Geral o host às vezes coloca o KPI no nó isSubtotal e as demais
- * medidas (complementos) em root.values — ambos são contexto de total, não de categoria.
+ * No Total Geral o host às vezes reparte as medidas entre isSubtotal e root.values —
+ * ambos são contexto de total, não de categoria. Percorre os nós até achar valor.
  */
 function readTotalMatrixValue(
-    node: DataViewMatrixNode | undefined,
-    fallbackNode: DataViewMatrixNode | undefined,
+    nodes: Array<DataViewMatrixNode | undefined>,
     sourceIndex: number,
 ): unknown {
-    const primary = readMatrixValue(node, sourceIndex);
-    if (primary != null && primary !== "") {
-        return primary;
+    const seen = new Set<DataViewMatrixNode>();
+    for (const node of nodes) {
+        if (!node || seen.has(node)) {
+            continue;
+        }
+        seen.add(node);
+        const value = readMatrixValue(node, sourceIndex);
+        if (value != null && value !== "") {
+            return value;
+        }
     }
-    if (fallbackNode && fallbackNode !== node) {
-        return readMatrixValue(fallbackNode, sourceIndex);
-    }
-    return primary;
+    return null;
 }
 
 function readTotalValueObjects(
-    node: DataViewMatrixNode | undefined,
-    fallbackNode: DataViewMatrixNode | undefined,
+    nodes: Array<DataViewMatrixNode | undefined>,
     sourceIndex: number,
 ): powerbi.DataViewObjects | undefined {
-    return (
-        readValueObjects(node, sourceIndex) ??
-        (fallbackNode && fallbackNode !== node ? readValueObjects(fallbackNode, sourceIndex) : undefined)
-    );
+    const seen = new Set<DataViewMatrixNode>();
+    for (const node of nodes) {
+        if (!node || seen.has(node)) {
+            continue;
+        }
+        seen.add(node);
+        const objects = readValueObjects(node, sourceIndex);
+        if (objects) {
+            return objects;
+        }
+    }
+    return undefined;
 }
 
 function buildTooltipLines(node: DataViewMatrixNode, tooltipMeasures: MeasureRef[]): TooltipLine[] {
@@ -140,13 +158,16 @@ function buildCell(
     measures: MeasureRef[],
     formatOpts?: ValueFormatOptions,
     rawOverride?: { primary?: number | null; complements?: Array<number | null> },
-    /** Só para Total Geral: segundo nó de contexto de total (ex.: root). */
-    totalFallbackNode?: DataViewMatrixNode,
+    /** Só para Total Geral: nós extras de contexto de total (ex.: root). */
+    totalContextNodes?: DataViewMatrixNode[],
 ): KpiCellData {
+    const totalNodes = totalContextNodes?.length
+        ? [node, ...totalContextNodes]
+        : [node];
     const primaryRaw =
         rawOverride?.primary !== undefined
             ? rawOverride.primary
-            : (readTotalMatrixValue(node, totalFallbackNode, column.valueSourceIndex) as number | null);
+            : (readTotalMatrixValue(totalNodes, column.valueSourceIndex) as number | null);
     const primary = formatMeasureValue(primaryRaw, column.format, formatOpts);
     const complements: ComplementValue[] = column.complements.map((slot, i) => {
         const measure = measures.find((m) => m.queryName === slot.queryName);
@@ -155,7 +176,7 @@ function buildCell(
             rawOverride?.complements && rawOverride.complements[i] !== undefined
                 ? rawOverride.complements[i]
                 : idx >= 0
-                  ? readTotalMatrixValue(node, totalFallbackNode, idx)
+                  ? readTotalMatrixValue(totalNodes, idx)
                   : null;
         return {
             slotIndex: slot.slotIndex,
@@ -182,7 +203,7 @@ function buildCell(
         primaryColor: column.primaryColor,
     };
 
-    const valueObjects = readTotalValueObjects(node, totalFallbackNode, column.valueSourceIndex);
+    const valueObjects = readTotalValueObjects(totalNodes, column.valueSourceIndex);
     // Fontes de CF por complemento: objects da própria medida do slot.
     // O nó da categoria (node.objects) recebe regras com selector ["category"].
     // Não misturar objects de outras medidas — cada slot tem propriedades próprias.
@@ -192,16 +213,9 @@ function buildCell(
         if (idx < 0) {
             return [];
         }
-        const sources = [readValueObjects(node, idx)];
-        if (totalFallbackNode && totalFallbackNode !== node) {
-            sources.push(readValueObjects(totalFallbackNode, idx));
-        }
-        return sources;
+        return totalNodes.map((n) => readValueObjects(n, idx));
     });
-    const rowObjects =
-        totalFallbackNode && totalFallbackNode !== node
-            ? [node?.objects, totalFallbackNode.objects]
-            : [node?.objects];
+    const rowObjects = totalNodes.map((n) => n?.objects);
     cell = mergeCellObjectsColors(
         cell,
         column,
@@ -294,8 +308,8 @@ function toRow(
     totalIconQueryName?: string,
     totalDisplayMode?: DisplayMode,
     forceTotal = false,
-    /** Segundo nó de contexto de total (root), só quando forceTotal. */
-    totalFallbackNode?: DataViewMatrixNode,
+    /** Nós extras de contexto de total (root / outros subtotais), só quando forceTotal. */
+    totalContextNodes?: DataViewMatrixNode[],
 ): MatrixRow {
     const isTotal = forceTotal || isSubtotalNode(node);
     const category = isTotal ? totalLabel : nodeValue(node);
@@ -313,7 +327,7 @@ function toRow(
     const displayMode: DisplayMode = isTotal
         ? totalDisplayMode || "both"
         : meta?.displayMode || "text";
-    const valueFallback = forceTotal ? totalFallbackNode : undefined;
+    const contextNodes = forceTotal ? totalContextNodes : undefined;
 
     return {
         category,
@@ -324,7 +338,7 @@ function toRow(
         iconPersisted: meta?.imageUrl,
         isTotal,
         sourceIndex: index,
-        cells: columns.map((col) => buildCell(node, col, measures, formatOpts, undefined, valueFallback)),
+        cells: columns.map((col) => buildCell(node, col, measures, formatOpts, undefined, contextNodes)),
         tooltips: buildTooltipLines(node, tooltips),
     };
 }
@@ -494,6 +508,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
     if (options.showTotal) {
         const subtotalNode =
             totalNodes.find((n) => nodeHasAnyValue(n, columns, measures)) ?? totalNodes[0];
+        const totalContext = [...totalNodes, root].filter((n): n is DataViewMatrixNode => Boolean(n));
         if (subtotalNode && nodeHasAnyValue(subtotalNode, columns, measures)) {
             totalRow = toRow(
                 subtotalNode,
@@ -506,7 +521,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
                 options.grandTotalIconQueryName,
                 options.grandTotalDisplayMode,
                 true,
-                root,
+                totalContext,
             );
         } else if (root && nodeHasAnyValue(root, columns, measures)) {
             totalRow = toRow(
@@ -520,6 +535,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
                 options.grandTotalIconQueryName,
                 options.grandTotalDisplayMode,
                 true,
+                totalContext,
             );
         } else if (sorted.length) {
             // Fallback: soma das linhas visíveis (quando o host não envia subtotal DAX).

@@ -427,6 +427,81 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(view.rows[0].cells[0].complements[0].value.raw === 0.4, "category row unchanged");
 }
 
+// Total Geral: valueSourceIndex como string no subtotal (host) — rótulo existia, valor sumia
+{
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    children: [
+                        {
+                            isSubtotal: true,
+                            values: {
+                                0: { value: 100, valueSourceIndex: "0" },
+                                1: { value: 0.53, valueSourceIndex: "1" },
+                                2: { value: 0.77, valueSourceIndex: "2" },
+                            },
+                        },
+                        {
+                            value: "A",
+                            values: {
+                                0: { value: 40 },
+                                1: { value: 0.4 },
+                                2: { value: 0.7 },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Delivery", roles: { kpis: true } },
+                {
+                    queryName: "ibp",
+                    displayName: "IBP %",
+                    roles: { complements: true },
+                    format: "0%",
+                },
+                {
+                    queryName: "quota",
+                    displayName: "Quota %",
+                    roles: { complements: true },
+                    format: "0%",
+                },
+            ],
+        },
+        metadata: {
+            columns: [
+                {
+                    queryName: "kpiA",
+                    roles: { kpis: true },
+                    objects: {
+                        kpiStyle: {
+                            complement1: "ibp",
+                            complement2: "quota",
+                            complement1Label: "IBP",
+                            complement2Label: "Quota",
+                        },
+                    },
+                },
+                { queryName: "ibp", roles: { complements: true } },
+                { queryName: "quota", roles: { complements: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total Geral",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: true,
+    });
+    const totalCell = view.totalRow!.cells[0];
+    assert(totalCell.complements[0].label === "IBP", "total shows complement title");
+    assert(totalCell.complements[0].value.raw === 0.53, "total complement value with string valueSourceIndex");
+    assert(totalCell.complements[0].value.text.length > 0, "total complement value text not empty");
+    assert(totalCell.complements[1].value.raw === 0.77, "total complement 2 value with string valueSourceIndex");
+}
+
 // Indicador percentual: a chave da célula não é o índice da medida
 {
     const dataView = {
