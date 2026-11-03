@@ -1,0 +1,200 @@
+.dkm-host {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.dkm-root,
+.dkm-root * {
+    box-sizing: border-box;
+}
+
+.dkm-root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.dkm-scroll {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    position: relative;
+}
+
+.dkm-grid {
+    display: grid;
+    width: max-content;
+    min-width: 100%;
+    align-content: start;
+}
+
+.dkm-row {
+    display: contents;
+}
+
+.dkm-cell {
+    border-style: solid;
+    border-color: inherit;
+    background: var(--row-bg, #fff);
+    border-bottom-width: 1px;
+    border-right-width: 1px;
+    border-left-width: 0;
+    border-top-width: 0;
+    min-width: 0;
+}
+
+.dkm-header .dkm-cell {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    border-bottom-width: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding: 8px 10px;
+    align-self: stretch;
+}
+
+.dkm-row-total .dkm-cell {
+    position: sticky;
+    top: 34px;
+    z-index: 3;
+    font-weight: 700;
+}
+
+.dkm-cat-cell {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    width: var(--cat-width, 180px);
+    padding: 8px 10px;
+    border-right-width: 2px;
+    display: flex;
+    align-items: center;
+}
+
+.dkm-header .dkm-cat-cell,
+.dkm-row-total .dkm-cat-cell {
+    z-index: 5;
+}
+
+.dkm-head-cell {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+}
+
+.dkm-kpi-cell {
+    padding: 0;
+}
+
+.dkm-cat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.dkm-cat-above {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.dkm-cat-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.25;
+}
+
+.dkm-icon {
+    flex: 0 0 auto;
+    object-fit: contain;
+    display: block;
+}
+
+.dkm-svg {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.dkm-svg svg {
+    width: 100%;
+    height: 100%;
+}
+
+.dkm-tip {
+    cursor: default;
+}
+
+.dkm-kpi {
+    height: 100%;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    overflow: hidden;
+}
+
+.dkm-primary {
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dkm-blank {
+    opacity: 0.45;
+}
+
+.dkm-comps {
+    display: flex;
+    gap: 8px 12px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.dkm-layout-vertical .dkm-comps {
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+.dkm-layout-horizontal .dkm-comps {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.dkm-comp {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.dkm-comp-label {
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dkm-comp-value {
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dkm-empty {
+    padding: 28px 16px;
+    text-align: center;
+    color: #888;
+    font-size: 14px;
+    font-family: "Segoe UI", Arial, sans-serif;
+}

@@ -1,0 +1,17 @@
+{
+		"version": "1.0.0.0",
+		"author": {"name":"Delvidio Demarchi Neto | DQExp","email":"contato@dqexp.com.br"},
+		"resources": [
+			{
+				"resourceId": "rId0",
+				"sourceType": 5,
+				"file": "resources/dynamicKpiMatrix38DD86777BAE45F6A2F7A719D886848F.pbiviz.json"
+			}
+		],
+		"visual": {"name":"dynamicKpiMatrix","displayName":"Dynamic KPI Matrix","guid":"dynamicKpiMatrix38DD86777BAE45F6A2F7A719D886848F","visualClassName":"Visual","version":"1.0.0.0","description":"Matriz dinâmica de KPIs com células multi-informação, Total Geral semântico, complementos mapeáveis e tooltips na coluna de categorias.","supportUrl":"https://learn.microsoft.com/power-bi/developer/visuals/overview","gitHubUrl":""},
+		"metadata": {
+			"pbivizjson": {
+				"resourceId": "rId0"
+			}
+		}
+	}

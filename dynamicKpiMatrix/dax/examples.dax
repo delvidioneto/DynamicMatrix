@@ -1,0 +1,35 @@
+-- Exemplos genéricos — adapte nomes de tabelas/colunas ao seu modelo.
+-- O visual não depende destes nomes; eles são apenas ilustrativos.
+
+-- KPI principal (moeda)
+Billing = SUM ( FatoVendas[Valor] )
+
+-- Complementos percentuais (decimal 0–1 recomendado para formatação %)
+[Billing IBP %] =
+DIVIDE ( [Billing], [Billing Meta IBP] )
+
+[Billing Quota %] =
+DIVIDE ( [Billing], [Billing Quota] )
+
+-- Outro KPI
+[Open Orders] =
+CALCULATE ( SUM ( FatoPedidos[Valor] ), FatoPedidos[Status] = "Open" )
+
+[Open IBP %] =
+DIVIDE ( [Open Orders], [Open Meta IBP] )
+
+-- Ícone opcional por categoria (URL ou SVG como texto)
+[Category Icon] =
+VAR cat = SELECTEDVALUE ( DimCategoria[Nome] )
+RETURN
+    SWITCH (
+        TRUE (),
+        cat = "Produto A", "https://contoso.example/icons/a.png",
+        cat = "Produto B", "https://contoso.example/icons/b.png",
+        BLANK ()
+    )
+
+-- Observação sobre Total Geral:
+-- Medidas não aditivas (%, médias, distinct count) devem ser escritas
+-- corretamente em DAX. O visual solicita o subtotal da matrix e exibe
+-- o valor que o modelo devolver — não recalcula somando as linhas.

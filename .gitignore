@@ -1,0 +1,17 @@
+# Dependencies
+**/node_modules/
+
+# Build / pbiviz temp
+**/.tmp/
+**/dist/*.map
+**/webpack.statistics*.html
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# Certificates (pbiviz local cert)
+**/*.pfx
+**/powerbi-visuals-tools*.pfx

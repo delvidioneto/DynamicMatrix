@@ -1,0 +1,42 @@
+{
+  "name": "dynamic-kpi-matrix",
+  "description": "Matriz dinâmica de KPIs para Power BI — células com valor principal e até quatro complementos",
+  "version": "1.0.0.0",
+  "author": {
+    "name": "Delvidio Demarchi Neto",
+    "email": "contato@dqexp.com.br",
+    "url": "https://dqexp.com.br"
+  },
+  "contributors": [
+    {
+      "name": "DQExp",
+      "email": "contato@dqexp.com.br",
+      "url": "https://dqexp.com.br"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/local/dynamic-kpi-matrix.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "pbiviz": "pbiviz",
+    "start": "pbiviz start",
+    "package": "pbiviz package",
+    "lint": "npx eslint .",
+    "test": "npx --yes tsx src/data/dataConverter.test.ts"
+  },
+  "dependencies": {
+    "@types/d3": "7.4.3",
+    "d3": "7.9.0",
+    "powerbi-visuals-api": "5.11.1",
+    "powerbi-visuals-utils-formattingmodel": "6.0.4"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.8.0",
+    "eslint": "^9.11.1",
+    "eslint-plugin-powerbi-visuals": "^1.0.0",
+    "powerbi-visuals-tools": "^7.2.1",
+    "typescript": "5.5.4"
+  }
+}
