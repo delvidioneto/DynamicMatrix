@@ -20,7 +20,7 @@
         },
         {
             "displayName": "Ícone da categoria",
-            "description": "Opcional: URL ou SVG/data URI por categoria (alternativa a imagens persistidas).",
+            "description": "Medidas SVG (texto). Arraste várias e escolha qual usar em Categorias e no Total Geral.",
             "name": "categoryIcon",
             "kind": "Measure"
         },
@@ -106,8 +106,12 @@
                 "imagesJson": { "type": { "text": true } },
                 "selectedCategory": { "type": { "text": true } },
                 "categoryTitle": { "type": { "text": true } },
+                "iconMeasure": {
+                    "displayName": "Medida SVG (categorias)",
+                    "type": { "text": true }
+                },
                 "imageType": {
-                    "displayName": "Tipo de imagem",
+                    "displayName": "Tipo de imagem (legado)",
                     "type": {
                         "enumeration": [
                             { "value": "png", "displayName": "PNG (upload)" },
@@ -133,8 +137,12 @@
                         ]
                     }
                 },
+                "iconMeasure": {
+                    "displayName": "Medida SVG (total)",
+                    "type": { "text": true }
+                },
                 "imageType": {
-                    "displayName": "Tipo de imagem",
+                    "displayName": "Tipo de imagem (legado)",
                     "type": {
                         "enumeration": [
                             { "value": "png", "displayName": "PNG (upload)" },
@@ -483,7 +491,7 @@
             "conditions": [
                 {
                     "category": { "max": 1 },
-                    "categoryIcon": { "max": 1 },
+                    "categoryIcon": { "max": 20 },
                     "kpis": { "min": 0, "max": 20 },
                     "complements": { "max": 40 },
                     "tooltips": { "max": 10 }
@@ -498,7 +506,7 @@
                     "select": [
                         { "for": { "in": "kpis" } },
                         { "for": { "in": "complements" } },
-                        { "bind": { "to": "categoryIcon" } },
+                        { "for": { "in": "categoryIcon" } },
                         { "for": { "in": "tooltips" } }
                     ]
                 }

@@ -114,6 +114,7 @@
     gap: 8px;
     width: 100%;
     min-width: 0;
+    height: 100%;
 }
 
 .dkm-cat-above {
@@ -121,11 +122,17 @@
     align-items: flex-start;
 }
 
+.dkm-cat-image-only {
+    justify-content: center;
+    align-items: center;
+}
+
 .dkm-cat-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     line-height: 1.25;
+    min-width: 0;
 }
 
 .dkm-icon {
@@ -143,6 +150,10 @@
     overflow: hidden;
     flex: 0 0 auto;
     max-width: 100%;
+}
+
+.dkm-svg-fill {
+    flex: 1 1 auto;
 }
 
 .dkm-svg svg {
@@ -212,10 +223,11 @@
 
 .dkm-comp-label {
     font-weight: 600;
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.15;
+    white-space: normal;
+    overflow: visible;
+    word-break: break-word;
+    max-width: 100%;
 }
 
 .dkm-comp-value-wrap {
@@ -239,12 +251,14 @@
     position: relative;
     z-index: 1;
     line-height: 1.15;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow: visible;
+    word-break: break-word;
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    max-width: 100%;
+    flex-wrap: wrap;
 }
 
 .dkm-icon-set {

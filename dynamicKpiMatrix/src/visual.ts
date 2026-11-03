@@ -107,6 +107,7 @@ export class Visual implements IVisual {
                 }
             }
             this.lastView = view;
+            this.formattingSettings.syncIconMeasureOptions(view.iconMeasureOptions);
             this.formattingSettings.syncCategoryEditorFromMap(
                 view.categoryNames,
                 this.stickySelectedCategory,
@@ -128,6 +129,7 @@ export class Visual implements IVisual {
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
         if (this.lastView) {
+            this.formattingSettings.syncIconMeasureOptions(this.lastView.iconMeasureOptions);
             this.formattingSettings.syncCategoryEditorFromMap(
                 this.lastView.categoryNames,
                 this.stickySelectedCategory,

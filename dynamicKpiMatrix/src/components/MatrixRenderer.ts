@@ -120,29 +120,70 @@ function resolveLayout(cell: KpiCellData, col: KpiColumnConfig): CellLayout {
     return cell.complements.length >= 3 ? "horizontal" : "vertical";
 }
 
-function fitImageSize(preferred: number, columnWidth: number): number {
-    const maxByColumn = Math.max(12, columnWidth - 16);
-    return Math.max(12, Math.min(preferred || 22, maxByColumn));
+function parseSvgIntrinsicSize(svgHtml: string): { w: number; h: number } | undefined {
+    const wAttr = svgHtml.match(/\bwidth\s*=\s*["']?\s*(\d+(?:\.\d+)?)\s*(?:px)?["']?/i);
+    const hAttr = svgHtml.match(/\bheight\s*=\s*["']?\s*(\d+(?:\.\d+)?)\s*(?:px)?["']?/i);
+    if (wAttr && hAttr) {
+        return { w: Number(wAttr[1]), h: Number(hAttr[1]) };
+    }
+    const vb = svgHtml.match(
+        /viewBox\s*=\s*["']?\s*[-\d.]+\s+[-\d.]+\s+([-\d.]+)\s+([-\d.]+)/i,
+    );
+    if (vb) {
+        return { w: Number(vb[1]), h: Number(vb[2]) };
+    }
+    return undefined;
+}
+
+/** Fonte do rótulo: reduz até caber na largura da célula (mín. 7px). */
+function fitLabelFontSize(label: string, baseSize: number, cellWidthPx: number): number {
+    const available = Math.max(24, cellWidthPx - 16);
+    const estimated = label.length * Math.max(baseSize, 8) * 0.58;
+    if (estimated <= available) {
+        return baseSize;
+    }
+    return Math.max(7, Math.floor(baseSize * (available / estimated)));
 }
 
 function imageHtml(
     raw: string | undefined,
-    size: number,
+    preferredSize: number,
     className: string,
     columnWidth: number,
+    fillCell: boolean,
 ): string {
     const resolved = resolveImageSource(raw);
-    const box = fitImageSize(size, columnWidth);
+    const maxW = Math.max(12, columnWidth - (fillCell ? 4 : 16));
     if (resolved.kind === "img") {
+        const box = Math.min(Math.max(preferredSize || 22, 12), maxW);
         return (
             `<img class="${className}" src="${esc(resolved.src)}" alt="" ` +
             `width="${box}" height="${box}" ` +
-            `style="width:${box}px;height:${box}px;max-width:100%;object-fit:contain" />`
+            `style="width:${fillCell ? "100%" : box + "px"};height:${fillCell ? "100%" : box + "px"};max-width:100%;object-fit:contain" />`
         );
     }
     if (resolved.kind === "svg") {
+        const intrinsic = parseSvgIntrinsicSize(resolved.html);
+        let w = preferredSize || 22;
+        let h = preferredSize || 22;
+        if (intrinsic && Number.isFinite(intrinsic.w) && Number.isFinite(intrinsic.h)) {
+            w = intrinsic.w;
+            h = intrinsic.h;
+        }
+        if (fillCell) {
+            return (
+                `<span class="${className} dkm-svg dkm-svg-fill" style="width:100%;height:100%;max-width:100%;max-height:100%">` +
+                `${resolved.html}</span>`
+            );
+        }
+        // Respeita tamanho do SVG na medida, limitado pela largura da coluna.
+        if (w > maxW) {
+            const scale = maxW / w;
+            w = maxW;
+            h = Math.max(12, Math.round(h * scale));
+        }
         return (
-            `<span class="${className} dkm-svg" style="width:${box}px;height:${box}px;max-width:100%">` +
+            `<span class="${className} dkm-svg" style="width:${w}px;height:${h}px;max-width:100%">` +
             `${resolved.html}</span>`
         );
     }
@@ -176,37 +217,13 @@ function pickCategoryImageSource(
     const fromStyleMap = styleCategoryImage(style, row.category);
     const configured = unwrapMeasureText(style.grandTotalImageData);
 
-    if (isTotal) {
-        if (style.grandTotalImageType === "svg") {
-            if (configured.toLowerCase().includes("<svg")) {
-                return configured;
-            }
-            if (measure.toLowerCase().includes("<svg")) {
-                return measure;
-            }
-            return configured || measure || persisted;
-        }
-        if (configured) {
-            return configured;
-        }
-        if (isRasterSource(measure)) {
-            return measure;
-        }
-        return persisted;
+    // Prioridade: medida SVG selecionada → legado persistido/configurado.
+    if (measure) {
+        return measure;
     }
-
-    if (style.categoryImageType === "svg") {
-        if (measure.toLowerCase().includes("<svg")) {
-            return measure;
-        }
-        const svgCandidate = persisted || fromStyleMap;
-        if (svgCandidate.toLowerCase().includes("<svg")) {
-            return svgCandidate;
-        }
-        return measure || svgCandidate;
+    if (isTotal && configured) {
+        return configured;
     }
-
-    // PNG: mapa persistido → estilo resolvido → medida raster.
     if (persisted) {
         return persisted;
     }
@@ -219,26 +236,33 @@ function pickCategoryImageSource(
     return "";
 }
 
-function categoryCellHtml(row: MatrixRow, style: ResolvedVisualStyle, isTotal: boolean): string {
+function categoryCellHtml(
+    row: MatrixRow,
+    style: ResolvedVisualStyle,
+    isTotal: boolean,
+    categoryColWidth: number,
+): string {
     const iconSource = pickCategoryImageSource(row, style, isTotal);
     const preferredSize = isTotal ? style.grandTotalImageSize : style.imageSize;
-    const icon = imageHtml(iconSource, preferredSize, "dkm-icon", style.categoryWidth);
+    const mode = isTotal ? style.grandTotalDisplayMode || "both" : "both";
+    const fillCell = isTotal && mode === "image";
+    const icon = imageHtml(iconSource, preferredSize, "dkm-icon", categoryColWidth, fillCell);
 
     const label = isTotal
         ? style.grandTotalLabel || row.displayTitle || "Total Geral"
         : row.displayTitle || row.category;
 
-    const mode = isTotal ? style.grandTotalDisplayMode || "both" : "both";
     const showText = mode === "text" || mode === "both";
     const showImage = (mode === "image" || mode === "both") && Boolean(icon);
     const place = style.imagePlacement;
     const tip = !isTotal && style.tooltipEnabled ? tipAttr(label, row) : "";
     const tipClass = tip ? " dkm-tip" : "";
+    const fillClass = fillCell && showImage && !showText ? " dkm-cat-image-only" : "";
 
     const textHtml = showText ? `<span class="dkm-cat-text">${esc(label)}</span>` : "";
     const inner = `${showImage ? icon : ""}${textHtml}`;
 
-    return `<div class="dkm-cat${tipClass}${place === "above" ? " dkm-cat-above" : ""}"${tip}>${inner}</div>`;
+    return `<div class="dkm-cat${tipClass}${fillClass}${place === "above" ? " dkm-cat-above" : ""}"${tip}>${inner}</div>`;
 }
 
 function iconGlyph(
@@ -290,11 +314,16 @@ function dataBarWidthPct(raw: number | null): number {
     return Math.max(0, Math.min(100, Math.log10(Math.abs(raw) + 1) * 25));
 }
 
-function kpiCellHtml(cell: KpiCellData, col: KpiColumnConfig, style: ResolvedVisualStyle): string {
+function kpiCellHtml(
+    cell: KpiCellData,
+    col: KpiColumnConfig,
+    style: ResolvedVisualStyle,
+    cellWidthPx: number,
+): string {
     const layout = resolveLayout(cell, col);
     const primarySize = col.primaryFontSize ?? style.valueFontSize ?? Math.max(style.fontSize + 2, 14);
     const compSize = col.complementFontSize ?? Math.max((style.valueFontSize || style.fontSize) - 3, 10);
-    const labelSize = col.labelFontSize ?? Math.max(style.fontSize - 2, 9);
+    const baseLabelSize = col.labelFontSize ?? Math.max(style.fontSize - 2, 9);
     const primaryColor = cell.primaryColor ?? col.primaryColor ?? style.valueFontColor ?? style.fontColor;
     const fallbackCompColor = col.complementColor ?? "#4A4A4A";
     const labelColor = col.labelColor ?? "#6B6B6B";
@@ -313,8 +342,14 @@ function kpiCellHtml(cell: KpiCellData, col: KpiColumnConfig, style: ResolvedVis
         `border-bottom-width:${style.valueBorderBottom ? bw : 0}px;` +
         `border-radius:${br}px;`;
 
-    const comps = cell.complements
-        .filter((c) => c.value.text)
+    // Em layout horizontal, cada complemento divide a largura da célula.
+    const visibleComps = cell.complements.filter((c) => c.value.text || c.label);
+    const slotWidth =
+        layout === "horizontal" && visibleComps.length > 1
+            ? Math.floor(cellWidthPx / visibleComps.length)
+            : cellWidthPx;
+
+    const comps = visibleComps
         .map((c) => {
             const fontColor = c.fontColor ?? fallbackCompColor;
             const back = c.backColor ? `background:${c.backColor};` : "";
@@ -329,12 +364,14 @@ function kpiCellHtml(cell: KpiCellData, col: KpiColumnConfig, style: ResolvedVis
                 c.dataBars && barPct > 0
                     ? `<span class="dkm-data-bar" style="width:${barPct}%;background:${barColor}"></span>`
                     : "";
+            const labelSize = fitLabelFontSize(c.label || c.displayName, baseLabelSize, slotWidth);
+            const valueSize = fitLabelFontSize(c.value.text || "", compSize, slotWidth);
             return (
-                `<div class="dkm-comp" style="${back}">` +
-                `<span class="dkm-comp-label" style="font-size:${labelSize}px;color:${labelColor}">${esc(c.label)}</span>` +
+                `<div class="dkm-comp" style="${back}max-width:100%">` +
+                `<span class="dkm-comp-label" style="font-size:${labelSize}px;color:${labelColor}">${esc(c.label || c.displayName)}</span>` +
                 `<span class="dkm-comp-value-wrap">` +
                 bar +
-                `<span class="dkm-comp-value" style="font-size:${compSize}px;color:${fontColor}">${icon}${valueInner}</span>` +
+                `<span class="dkm-comp-value" style="font-size:${valueSize}px;color:${fontColor}">${icon}${valueInner}</span>` +
                 `</span></div>`
             );
         })
@@ -367,6 +404,7 @@ function renderRow(
     columns: KpiColumnConfig[],
     style: ResolvedVisualStyle,
     index: number,
+    colWidthsPx: number[],
 ): string {
     const isTotal = row.isTotal;
     const height = isTotal ? style.grandTotalRowHeight : style.rowHeight;
@@ -377,6 +415,7 @@ function renderRow(
     const align = isTotal ? style.grandTotalAlignment : style.categoryAlignment;
     const rowRadius = style.rowBorderRadius;
     const colRadius = style.columnBorderRadius;
+    const catW = colWidthsPx[0] || style.categoryWidth;
 
     const cells = columns
         .map((col, i) => {
@@ -387,9 +426,10 @@ function renderRow(
                 layout: col.layout,
             };
             const isLast = i === columns.length - 1;
+            const cellW = colWidthsPx[i + 1] || style.columnWidth || 140;
             return (
                 `<div class="dkm-cell dkm-kpi-cell${isLast ? " dkm-cell-last" : ""}">` +
-                kpiCellHtml(cell, col, style) +
+                kpiCellHtml(cell, col, style, cellW) +
                 `</div>`
             );
         })
@@ -397,7 +437,7 @@ function renderRow(
 
     return (
         `<div class="dkm-row${isTotal ? " dkm-row-total" : ""}" style="--row-bg:${bg};--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${rowRadius}px;--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${colRadius}px;--col-gap:${style.columnGap}px;min-height:${height}px;margin-bottom:${style.rowGap}px">` +
-        `<div class="dkm-cell dkm-cat-cell" style="font-size:${fontSize}px;color:${fontColor};font-weight:${fontWeight};text-align:${align}">${categoryCellHtml(row, style, isTotal)}</div>` +
+        `<div class="dkm-cell dkm-cat-cell" style="font-size:${fontSize}px;color:${fontColor};font-weight:${fontWeight};text-align:${align}">${categoryCellHtml(row, style, isTotal, catW)}</div>` +
         cells +
         `</div>`
     );
@@ -424,13 +464,15 @@ export function buildMatrixHtml(view: VisualViewModel, style: ResolvedVisualStyl
     }
 
     const templateColumns = resolveGridTemplateColumns(view, style);
-    const catTrack = templateColumns.split(" ")[0] || `${style.categoryWidth}px`;
-    const catWidthPx = Number.parseInt(catTrack, 10) || style.categoryWidth;
+    const colWidthsPx = templateColumns.split(" ").map((t) => Number.parseInt(t, 10) || 0);
+    const catWidthPx = colWidthsPx[0] || style.categoryWidth;
 
-    const bodyRows = view.rows.map((row, i) => renderRow(row, view.columns, style, i)).join("");
+    const bodyRows = view.rows
+        .map((row, i) => renderRow(row, view.columns, style, i, colWidthsPx))
+        .join("");
     const total =
         style.grandTotalShow && view.totalRow
-            ? renderRow(view.totalRow, view.columns, style, -1)
+            ? renderRow(view.totalRow, view.columns, style, -1, colWidthsPx)
             : "";
 
     // Cabeçalho + Total Geral ficam em bloco sticky no topo (sempre visíveis).

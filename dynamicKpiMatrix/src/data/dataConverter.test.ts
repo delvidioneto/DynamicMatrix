@@ -345,6 +345,7 @@ function assert(condition: unknown, message: string): asserts condition {
                 tooltips: [],
             },
             complementOptions: [],
+            iconMeasureOptions: [],
             categoryNames: ["Produto A"],
         },
         defaultStyle,

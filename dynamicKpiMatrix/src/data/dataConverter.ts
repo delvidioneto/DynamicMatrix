@@ -168,11 +168,11 @@ function toRow(
     metaMap: CategoryMetaMap,
     totalLabel: string,
     formatOpts?: ValueFormatOptions,
+    iconMeasure?: MeasureRef,
 ): MatrixRow {
     const isTotal = isSubtotalNode(node);
     const category = isTotal ? totalLabel : nodeValue(node);
     const meta = isTotal ? undefined : findCategoryMeta(metaMap, category);
-    const iconMeasure = measures.find((m) => m.role === "categoryIcon");
     const iconRaw = iconMeasure
         ? unwrapMeasureText(String(readMatrixValue(node, iconMeasure.valueSourceIndex) ?? ""))
         : "";
@@ -294,6 +294,25 @@ export interface ConvertOptions {
     showTotal: boolean;
     displayUnits?: number;
     precision?: number;
+    categoryIconQueryName?: string;
+    grandTotalIconQueryName?: string;
+}
+
+function pickIconMeasure(
+    measures: MeasureRef[],
+    preferredQueryName: string | undefined,
+): MeasureRef | undefined {
+    const icons = measures.filter((m) => m.role === "categoryIcon");
+    if (!icons.length) {
+        return undefined;
+    }
+    if (preferredQueryName) {
+        const match = icons.find((m) => m.queryName === preferredQueryName);
+        if (match) {
+            return match;
+        }
+    }
+    return icons[0];
 }
 
 export function convertDataView(dataView: DataView | undefined, options: ConvertOptions): VisualViewModel {
@@ -302,6 +321,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             columns: [],
             rows: [],
             complementOptions: [],
+            iconMeasureOptions: [],
             categoryNames: [],
             emptyMessage: "Adicione uma categoria e ao menos um valor.",
         };
@@ -320,6 +340,8 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
         displayUnits: options.displayUnits,
         precision: options.precision,
     };
+    const categoryIcon = pickIconMeasure(measures, options.categoryIconQueryName);
+    const totalIcon = pickIconMeasure(measures, options.grandTotalIconQueryName);
     const root = matrix.rows?.root;
     const rootChildren = root?.children ?? [];
 
@@ -327,7 +349,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
     const dataNodes = rootChildren.filter((n) => !isSubtotalNode(n));
 
     const dataRows = dataNodes.map((node, i) =>
-        toRow(node, i, columns, measures, metaMap, options.totalLabel, formatOpts),
+        toRow(node, i, columns, measures, metaMap, options.totalLabel, formatOpts, categoryIcon),
     );
     const sorted = sortRows(dataRows, options.sortMode, options.sortKpiQueryName);
 
@@ -335,9 +357,18 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
     if (options.showTotal) {
         const subtotalNode = totalNodes.find((n) => nodeHasAnyValue(n, columns)) ?? totalNodes[0];
         if (subtotalNode && nodeHasAnyValue(subtotalNode, columns)) {
-            totalRow = toRow(subtotalNode, -1, columns, measures, metaMap, options.totalLabel, formatOpts);
+            totalRow = toRow(
+                subtotalNode,
+                -1,
+                columns,
+                measures,
+                metaMap,
+                options.totalLabel,
+                formatOpts,
+                totalIcon,
+            );
         } else if (root && nodeHasAnyValue(root, columns)) {
-            totalRow = toRow(root, -1, columns, measures, metaMap, options.totalLabel, formatOpts);
+            totalRow = toRow(root, -1, columns, measures, metaMap, options.totalLabel, formatOpts, totalIcon);
             totalRow.isTotal = true;
         } else if (sorted.length) {
             // Fallback: soma das linhas visíveis (quando o host não envia subtotal DAX).
@@ -349,11 +380,18 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             totalRow.categoryKey = options.totalLabel;
             totalRow.displayTitle = options.totalLabel;
             totalRow.isTotal = true;
+            // Garante ícone do total mesmo no fallback de soma.
+            if (!totalRow.iconRaw && totalIcon) {
+                totalRow.iconRaw = "";
+            }
         }
     }
 
     const complementOptions = measures
         .filter((m) => m.role === "complements")
+        .map((m) => ({ queryName: m.queryName, displayName: m.displayName }));
+    const iconMeasureOptions = measures
+        .filter((m) => m.role === "categoryIcon")
         .map((m) => ({ queryName: m.queryName, displayName: m.displayName }));
 
     if (!columns.length && !sorted.length) {
@@ -362,6 +400,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             rows: sorted,
             totalRow,
             complementOptions,
+            iconMeasureOptions,
             categoryNames: sorted.map((r) => r.category),
             emptyMessage: "Adicione medidas ao campo Valores.",
         };
@@ -372,6 +411,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
         rows: sorted,
         totalRow,
         complementOptions,
+        iconMeasureOptions,
         categoryNames: sorted.map((r) => r.category),
     };
 }

@@ -43,10 +43,7 @@ const DISPLAY_MODES = [
     { value: "image", displayName: "Somente imagem" },
 ];
 
-const IMAGE_TYPES = [
-    { value: "png", displayName: "PNG (upload)" },
-    { value: "svg", displayName: "SVG (medida/texto)" },
-];
+const NONE_ICON = { value: "", displayName: "(nenhuma medida SVG)" };
 
 const ALIGNS = [
     { value: "left", displayName: "Esquerda" },
@@ -170,37 +167,41 @@ class CategoriesCard extends FormattingSettingsCard {
 }
 
 class CategoryImagesCard extends FormattingSettingsCard {
+    iconMeasure = new formattingSettings.ItemDropdown({
+        name: "iconMeasure",
+        displayName: "Medida SVG (linhas)",
+        items: [NONE_ICON],
+        value: NONE_ICON,
+    });
     selectedCategory = new formattingSettings.ItemDropdown({
         name: "selectedCategory",
-        displayName: "Categoria",
+        displayName: "Categoria (título)",
         items: [PLACEHOLDER_CATEGORY],
         value: PLACEHOLDER_CATEGORY,
     });
     categoryTitle = text("categoryTitle", "Título", "", "Deixe vazio para usar o nome da tabela");
-    imageType = dropdown("imageType", "Tipo de imagem", "png", IMAGE_TYPES);
+    // Legado (oculto) — mantém persistência antiga sem poluir o painel.
+    imageType = dropdown("imageType", "Tipo de imagem", "svg", [
+        { value: "svg", displayName: "SVG" },
+        { value: "png", displayName: "PNG" },
+    ]);
     imageData = new formattingSettings.ImageUpload({
         name: "imageData",
         displayName: "Upload PNG",
         value: { ...EMPTY_IMAGE },
     });
-    /** Persistência textual do PNG (o parser do ImageUpload descarta objetos sem .solid). */
-    imageUrl = text(
-        "imageUrl",
-        "URL ou data URI (PNG)",
-        "",
-        "Cole data:image/png;base64,... ou https://...",
-    );
+    imageUrl = text("imageUrl", "URL ou data URI", "", "");
     svgMarkup = new formattingSettings.TextArea({
         name: "svgMarkup",
         displayName: "SVG (texto)",
         value: "",
-        placeholder: '"<svg>...</svg>" ou cole o SVG; também pode usar o campo Ícone da categoria',
+        placeholder: "",
     });
     categoriesJson = new formattingSettings.TextArea({
         name: "categoriesJson",
-        displayName: "Mapa persistido (avançado)",
+        displayName: "Mapa persistido",
         value: "{}",
-        placeholder: '{"Categoria":{"title":"Título","imageUrl":"data:..."}}',
+        placeholder: "{}",
     });
     imagesJson = new formattingSettings.TextArea({
         name: "imagesJson",
@@ -212,22 +213,18 @@ class CategoryImagesCard extends FormattingSettingsCard {
     name = "categoryImages";
     displayName = "Imagens das categorias";
     description =
-        "Selecione a categoria → PNG: use Upload e/ou cole a URL/data URI. SVG: cole o markup ou use a medida Ícone da categoria.";
+        "Arraste medidas SVG em Ícone da categoria e selecione qual usar nas linhas. O tamanho vem do SVG da medida.";
     slices: FormattingSettingsSlice[] = [
+        this.iconMeasure,
         this.selectedCategory,
         this.categoryTitle,
-        this.imageType,
-        this.imageData,
-        this.imageUrl,
-        this.svgMarkup,
-        this.categoriesJson,
     ];
 
     public onPreProcess(): void {
-        const isPng = asImageType(this.imageType.value?.value) === "png";
-        this.imageData.visible = isPng;
-        this.imageUrl.visible = isPng;
-        this.svgMarkup.visible = !isPng;
+        this.imageType.visible = false;
+        this.imageData.visible = false;
+        this.imageUrl.visible = false;
+        this.svgMarkup.visible = false;
         this.imagesJson.visible = false;
         this.categoriesJson.visible = false;
     }
@@ -237,30 +234,34 @@ class GrandTotalCard extends FormattingSettingsCard {
     show = toggle("show", "Exibir Total Geral", defaultStyle.grandTotalShow);
     label = text("label", "Texto", defaultStyle.grandTotalLabel, "Total Geral");
     displayMode = dropdown("displayMode", "Exibição", "both", DISPLAY_MODES);
-    imageType = dropdown("imageType", "Tipo de imagem", "png", IMAGE_TYPES);
+    iconMeasure = new formattingSettings.ItemDropdown({
+        name: "iconMeasure",
+        displayName: "Medida SVG (total)",
+        items: [NONE_ICON],
+        value: NONE_ICON,
+    });
+    imageType = dropdown("imageType", "Tipo de imagem", "svg", [
+        { value: "svg", displayName: "SVG" },
+        { value: "png", displayName: "PNG" },
+    ]);
     imageData = new formattingSettings.ImageUpload({
         name: "imageData",
         displayName: "Upload PNG",
         value: { ...EMPTY_IMAGE },
     });
-    imageUrl = text(
-        "imageUrl",
-        "URL ou data URI (PNG)",
-        "",
-        "Cole data:image/png;base64,... ou https://...",
-    );
+    imageUrl = text("imageUrl", "URL ou data URI", "", "");
     svgMarkup = new formattingSettings.TextArea({
         name: "svgMarkup",
         displayName: "SVG (texto)",
         value: "",
-        placeholder: '"<svg>...</svg>" ou use a medida Ícone da categoria no total',
+        placeholder: "",
     });
     fontSize = num("fontSize", "Tamanho da fonte", defaultStyle.grandTotalFontSize);
     fontColor = color("fontColor", "Cor da fonte", defaultStyle.grandTotalFontColor);
     background = color("background", "Cor de fundo", defaultStyle.grandTotalBackground);
     rowHeight = num("rowHeight", "Altura da linha", defaultStyle.grandTotalRowHeight);
     alignment = dropdown("alignment", "Alinhamento", defaultStyle.grandTotalAlignment, ALIGNS);
-    imageSize = num("imageSize", "Tamanho da imagem", defaultStyle.grandTotalImageSize);
+    imageSize = num("imageSize", "Tamanho máx. da imagem", defaultStyle.grandTotalImageSize);
 
     name = "grandTotal";
     displayName = "Total Geral";
@@ -268,10 +269,7 @@ class GrandTotalCard extends FormattingSettingsCard {
     slices: FormattingSettingsSlice[] = [
         this.label,
         this.displayMode,
-        this.imageType,
-        this.imageData,
-        this.imageUrl,
-        this.svgMarkup,
+        this.iconMeasure,
         this.fontSize,
         this.fontColor,
         this.background,
@@ -281,10 +279,10 @@ class GrandTotalCard extends FormattingSettingsCard {
     ];
 
     public onPreProcess(): void {
-        const isPng = asImageType(this.imageType.value?.value) === "png";
-        this.imageData.visible = isPng;
-        this.imageUrl.visible = isPng;
-        this.svgMarkup.visible = !isPng;
+        this.imageType.visible = false;
+        this.imageData.visible = false;
+        this.imageUrl.visible = false;
+        this.svgMarkup.visible = false;
     }
 }
 
@@ -472,10 +470,11 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
                 this.ensureSelectedCategoryItem(selectedName);
             }
 
-            if (catObj.imageType != null) {
-                const t = asImageType(catObj.imageType);
-                this.categoryImages.imageType.value =
-                    IMAGE_TYPES.find((i) => i.value === t) ?? IMAGE_TYPES[0];
+            if (typeof catObj.iconMeasure === "string" && catObj.iconMeasure.trim()) {
+                this.ensureIconMeasureItem(
+                    this.categoryImages.iconMeasure,
+                    catObj.iconMeasure.trim(),
+                );
             }
 
             const upload = coerceImageValue(catObj.imageData);
@@ -510,9 +509,8 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
 
         const gtObj = objects.grandTotal as Record<string, unknown> | undefined;
         if (gtObj) {
-            if (gtObj.imageType != null) {
-                const t = asImageType(gtObj.imageType);
-                this.grandTotal.imageType.value = IMAGE_TYPES.find((i) => i.value === t) ?? IMAGE_TYPES[0];
+            if (typeof gtObj.iconMeasure === "string" && gtObj.iconMeasure.trim()) {
+                this.ensureIconMeasureItem(this.grandTotal.iconMeasure, gtObj.iconMeasure.trim());
             }
             const upload = coerceImageValue(gtObj.imageData);
             const urlText = unwrapMeasureText(
@@ -557,16 +555,62 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         this.categoryImages.selectedCategory.value = match;
     }
 
+    private ensureIconMeasureItem(
+        dropdown: formattingSettings.ItemDropdown,
+        queryName: string,
+        displayName?: string,
+    ): void {
+        const items = dropdown.items ?? [NONE_ICON];
+        let match = items.find((i) => String(i.value) === queryName);
+        if (!match) {
+            match = { value: queryName, displayName: displayName || queryName };
+            dropdown.items = [...items.filter((i) => String(i.value) !== ""), match];
+            if (!dropdown.items.find((i) => String(i.value) === "")) {
+                dropdown.items = [NONE_ICON, ...dropdown.items];
+            }
+        }
+        dropdown.value = match;
+    }
+
+    public syncIconMeasureOptions(
+        options: Array<{ queryName: string; displayName: string }>,
+    ): void {
+        const items = [
+            NONE_ICON,
+            ...options.map((o) => ({ value: o.queryName, displayName: o.displayName })),
+        ];
+        this.categoryImages.iconMeasure.items = items;
+        this.grandTotal.iconMeasure.items = items;
+
+        const catSelected = String(this.categoryImages.iconMeasure.value?.value ?? "").trim();
+        this.categoryImages.iconMeasure.value =
+            items.find((i) => String(i.value) === catSelected) ??
+            (options[0] ? { value: options[0].queryName, displayName: options[0].displayName } : NONE_ICON);
+
+        const gtSelected = String(this.grandTotal.iconMeasure.value?.value ?? "").trim();
+        this.grandTotal.iconMeasure.value =
+            items.find((i) => String(i.value) === gtSelected) ??
+            (options[0] ? { value: options[0].queryName, displayName: options[0].displayName } : NONE_ICON);
+    }
+
     public getSelectedCategoryName(): string {
         return String(this.categoryImages.selectedCategory.value?.value ?? "").trim();
     }
 
+    public getCategoryIconQueryName(): string {
+        return String(this.categoryImages.iconMeasure.value?.value ?? "").trim();
+    }
+
+    public getGrandTotalIconQueryName(): string {
+        return String(this.grandTotal.iconMeasure.value?.value ?? "").trim();
+    }
+
     public getCategoryImageType(): ImageSourceType {
-        return asImageType(this.categoryImages.imageType.value?.value);
+        return "svg";
     }
 
     public getGrandTotalImageType(): ImageSourceType {
-        return asImageType(this.grandTotal.imageType.value?.value);
+        return "svg";
     }
 
     public getCategoryMetaMap(): CategoryMetaMap {
@@ -576,42 +620,23 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         );
     }
 
-    /** Imagem efetiva do editor da categoria selecionada (PNG upload ou SVG texto). */
+    /** Payload legado de imagem por categoria (títulos). Imagens vêm das medidas SVG. */
     public getEditorImagePayload(): { imageUrl: string; imageName: string } {
-        if (this.getCategoryImageType() === "svg") {
-            const svg = unwrapMeasureText(this.categoryImages.svgMarkup.value || "");
-            return { imageUrl: svg, imageName: svg ? "svg" : "" };
-        }
-        const fromUpload = imageValueToStorage(this.categoryImages.imageData.value);
-        const fromUrl = unwrapMeasureText(this.categoryImages.imageUrl.value || "");
-        // Fallback: imagem já salva no mapa da categoria selecionada.
         const selected = this.getSelectedCategoryName();
-        const fromMap =
-            selected && this.getCategoryImageType() === "png"
-                ? findCategoryMeta(this.getCategoryMetaMap(), selected)?.imageUrl || ""
-                : "";
-        const imageUrl = fromUpload || fromUrl || fromMap || "";
-        return {
-            imageUrl,
-            imageName: this.categoryImages.imageData.value?.name || (imageUrl ? "image" : ""),
-        };
+        const fromMap = selected
+            ? findCategoryMeta(this.getCategoryMetaMap(), selected)?.imageUrl || ""
+            : "";
+        return { imageUrl: fromMap, imageName: fromMap ? "image" : "" };
     }
 
-    /** Mescla título/imagem da categoria selecionada no mapa persistente. */
+    /** Mescla título da categoria selecionada no mapa persistente. */
     public buildSyncedCategoriesJson(): string {
         const selected = this.getSelectedCategoryName();
         let map = this.getCategoryMetaMap();
         if (selected) {
-            const payload = this.getEditorImagePayload();
-            const patch: Parameters<typeof upsertCategoryMeta>[2] = {
+            map = upsertCategoryMeta(map, selected, {
                 title: this.categoryImages.categoryTitle.value || "",
-            };
-            // Só grava/atualiza imagem quando há conteúdo — nunca apaga no sync vazio.
-            if (payload.imageUrl) {
-                patch.imageUrl = payload.imageUrl;
-                patch.imageName = payload.imageName || "image";
-            }
-            map = upsertCategoryMeta(map, selected, patch);
+            });
         }
         return serializeCategoryMetaMap(map);
     }
@@ -633,29 +658,16 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         this.categoryImages.selectedCategory.value = match;
 
         const map = this.getCategoryMetaMap();
-        const meta = selected ? map[selected] : undefined;
+        const meta = selected ? findCategoryMeta(map, selected) : undefined;
         this.categoryImages.categoryTitle.value = meta?.title || "";
-
-        const imageUrl = meta?.imageUrl || "";
-        if (this.getCategoryImageType() === "svg") {
-            this.categoryImages.svgMarkup.value = imageUrl.includes("<svg") ? imageUrl : "";
-            this.categoryImages.imageData.value = { ...EMPTY_IMAGE };
-            this.categoryImages.imageUrl.value = "";
-        } else {
-            this.categoryImages.imageData.value = imageValueFromMeta(meta);
-            this.categoryImages.imageUrl.value = imageUrl;
-            this.categoryImages.svgMarkup.value = "";
-        }
     }
 
-    /** Imagem do Total Geral: PNG persistido ou SVG texto. */
+    /** Imagem do Total Geral (legado svgMarkup/url — preferir medida SVG). */
     public getGrandTotalImagePayload(): string {
-        if (this.getGrandTotalImageType() === "svg") {
-            return unwrapMeasureText(this.grandTotal.svgMarkup.value || "");
-        }
         const fromUpload = imageValueToStorage(this.grandTotal.imageData.value);
         const fromUrl = unwrapMeasureText(this.grandTotal.imageUrl.value || "");
-        return fromUpload || fromUrl;
+        const fromSvg = unwrapMeasureText(this.grandTotal.svgMarkup.value || "");
+        return fromSvg || fromUpload || fromUrl;
     }
 
     /**
@@ -792,12 +804,14 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             imageSize: this.categories.imageSize.value,
             imagePlacement: String(this.categories.imagePlacement.value.value) as ImagePlacement,
             categoryImageType: this.getCategoryImageType(),
+            categoryIconQueryName: this.getCategoryIconQueryName(),
             sortMode: String(this.categories.sortMode.value.value) as SortMode,
             sortKpiQueryName: this.categories.sortKpiQueryName.value || "",
             grandTotalShow: this.grandTotal.show.value,
             grandTotalLabel: label,
             grandTotalDisplayMode: String(this.grandTotal.displayMode.value.value) as DisplayMode,
             grandTotalImageType: this.getGrandTotalImageType(),
+            grandTotalIconQueryName: this.getGrandTotalIconQueryName(),
             grandTotalImageData: grandImage,
             grandTotalFontSize: this.grandTotal.fontSize.value,
             grandTotalFontColor: this.grandTotal.fontColor.value.value,
@@ -852,6 +866,8 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             showTotal: style.grandTotalShow,
             displayUnits: style.valueDisplayUnits,
             precision: style.valuePrecision,
+            categoryIconQueryName: style.categoryIconQueryName,
+            grandTotalIconQueryName: style.grandTotalIconQueryName,
         };
     }
 }

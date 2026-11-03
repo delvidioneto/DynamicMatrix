@@ -118,6 +118,8 @@ export interface VisualViewModel {
     rows: MatrixRow[];
     totalRow?: MatrixRow;
     complementOptions: Array<{ queryName: string; displayName: string }>;
+    /** Medidas do well Ícone da categoria (SVG). */
+    iconMeasureOptions: Array<{ queryName: string; displayName: string }>;
     categoryNames: string[];
     emptyMessage?: string;
 }
@@ -141,12 +143,16 @@ export interface ResolvedVisualStyle {
     imageSize: number;
     imagePlacement: ImagePlacement;
     categoryImageType: ImageSourceType;
+    /** queryName da medida SVG usada nas linhas de categoria. */
+    categoryIconQueryName: string;
     sortMode: SortMode;
     sortKpiQueryName: string;
     grandTotalShow: boolean;
     grandTotalLabel: string;
     grandTotalDisplayMode: DisplayMode;
     grandTotalImageType: ImageSourceType;
+    /** queryName da medida SVG usada no Total Geral. */
+    grandTotalIconQueryName: string;
     grandTotalImageData: string;
     grandTotalFontSize: number;
     grandTotalFontColor: string;
@@ -207,13 +213,15 @@ export const defaultStyle: ResolvedVisualStyle = {
     categoryAlignment: "left",
     imageSize: 22,
     imagePlacement: "left",
-    categoryImageType: "png",
+    categoryImageType: "svg",
+    categoryIconQueryName: "",
     sortMode: "data",
     sortKpiQueryName: "",
     grandTotalShow: true,
     grandTotalLabel: "Total Geral",
     grandTotalDisplayMode: "both",
-    grandTotalImageType: "png",
+    grandTotalImageType: "svg",
+    grandTotalIconQueryName: "",
     grandTotalImageData: "",
     grandTotalFontSize: 13,
     grandTotalFontColor: "#111111",
