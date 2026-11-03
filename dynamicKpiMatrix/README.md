@@ -1,6 +1,6 @@
 # Dynamic KPI Matrix
 
-Visual personalizado para Microsoft Power BI: matriz dinâmica em que **cada célula é um card** com um **valor principal** e até **quatro informações complementares**.
+Visual personalizado para Microsoft Power BI: matriz dinâmica em que **cada célula é um card** com um **valor principal** e até **duas informações complementares**.
 
 Não depende de nomes fixos de tabelas, categorias ou medidas — funciona com qualquer modelo semântico.
 
@@ -48,7 +48,7 @@ O Power BI não permite wells aninhados “por coluna”. Por isso:
 2. Abra **Formato do visual → Indicadores**.
 3. Escolha o valor (KPI) no seletor.
 4. Em **Coluna** e **Valor principal**, ajuste título, orientação, largura e o valor principal.
-5. Em **Complemento 1**, **Complemento 2**, **Complemento 3** e **Complemento 4**, cada bloco tem a própria medida, rótulo e formatação (tamanho e cor da fonte, fundo, barras, ícones e URL). O que você altera em um complemento não muda os outros.
+5. Em **Complemento**, escolha **Complemento 1** ou **Complemento 2** no dropdown. Cada slot tem a própria medida, rótulo e formatação (tamanho e cor da fonte, fundo, barras, ícones, URL e formatação condicional). Alternar o seletor não sobrescreve o outro complemento.
 
 A associação usa o `queryName` da medida (não a posição no well), então reordenar ou remover outras medidas não “quebra” o mapeamento.
 
@@ -62,7 +62,7 @@ Principais cards no painel **Formato**:
 | **Cabeçalho** | **Texto** e **Fundo** dos títulos das colunas |
 | **Categorias** | **Coluna**, **Texto**, **Ícone** e **Por categoria** (exibição, texto e SVG) |
 | **Valores** | **Texto**, **Número** (unidades e casas decimais) e **Borda** por lado |
-| **Indicadores** | Por coluna: **Coluna**, **Valor principal** e **Complemento 1–4** (formatação de cada um) |
+| **Indicadores** | Por coluna: **Coluna**, **Valor principal** e **Complemento** (seletor 1 ou 2 + formatação do slot) |
 | **Linhas** | **Fundo** (zebra), **Borda** e **Tamanho** |
 | **Colunas** | **Medidas**, **Fundo** e **Borda** |
 | **Total Geral** | **Conteúdo**, **Texto**, **Célula** e **Ícone** |
@@ -116,7 +116,7 @@ A borda envolve o **card interno** (valor principal + complementos), não a grad
 
 ### Formatação condicional nos complementos
 
-Em **Indicadores**, dentro de cada **Complemento 1–4**, as cores de fonte, fundo e barra usam o botão **fx** (regras nativas do Power BI). A regra vale só para aquele complemento.
+Em **Indicadores → Complemento**, selecione o slot e configure as cores de fonte, fundo e barra com o botão **fx** (regras nativas do Power BI). A regra vale só para aquele complemento.
 
 ---
 

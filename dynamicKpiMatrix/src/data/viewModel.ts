@@ -12,9 +12,11 @@ export type VerticalBorderHeight = "full" | "content" | "custom";
 export type CfApplyTo = "value" | "background" | "both";
 export type ComplementIconSet = "none" | "directional" | "traffic" | "triangles";
 export type CellElementKind = "font" | "background" | "dataBars" | "icons" | "webUrl";
+/** Slots ativos na UI de Indicadores (máx. 2 por KPI). */
+export type ComplementSlotIndex = 1 | 2;
 
 export interface ComplementSlot {
-    slotIndex: 1 | 2 | 3 | 4;
+    slotIndex: ComplementSlotIndex;
     queryName: string;
     label: string;
     displayName: string;
@@ -34,7 +36,7 @@ export interface KpiColumnConfig {
     title: string;
     layout: CellLayout;
     complements: ComplementSlot[];
-    editingComplementSlot: 1 | 2 | 3 | 4;
+    editingComplementSlot: ComplementSlotIndex;
     editingElementKind: CellElementKind;
     widthMode: WidthMode;
     columnWidth: number;
@@ -76,7 +78,7 @@ export interface FormattedValue {
 }
 
 export interface ComplementValue {
-    slotIndex: 1 | 2 | 3 | 4;
+    slotIndex: ComplementSlotIndex;
     label: string;
     displayName: string;
     queryName: string;

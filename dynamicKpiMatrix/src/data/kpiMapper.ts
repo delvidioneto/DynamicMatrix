@@ -5,10 +5,14 @@ import {
     CellElementKind,
     ComplementIconSet,
     ComplementSlot,
+    ComplementSlotIndex,
     defaultKpiStyle,
     KpiColumnConfig,
     MeasureRef,
 } from "./viewModel";
+
+/** Slots configuráveis na seção Indicadores. */
+const ACTIVE_SLOT_INDEXES: ComplementSlotIndex[] = [1, 2];
 
 type DataViewObjects = powerbi.DataViewObjects;
 
@@ -104,12 +108,8 @@ function normalizeComplementQueryName(raw: string): string {
     return q;
 }
 
-function asSlotIndex(value: unknown): 1 | 2 | 3 | 4 {
-    const n = Number(value);
-    if (n === 2 || n === 3 || n === 4) {
-        return n;
-    }
-    return 1;
+function asSlotIndex(value: unknown): ComplementSlotIndex {
+    return Number(value) === 2 ? 2 : 1;
 }
 
 function asIconSet(value: unknown): ComplementIconSet {
@@ -128,7 +128,7 @@ function asElementKind(value: unknown): CellElementKind {
     return "font";
 }
 
-function readSlotStyle(styleObjects: DataViewObjects | undefined, i: 1 | 2 | 3 | 4) {
+function readSlotStyle(styleObjects: DataViewObjects | undefined, i: ComplementSlotIndex) {
     const fontSize = asNumber(readProp(styleObjects, "kpiStyle", `complement${i}FontSize`), NaN);
     return {
         fontColor: solidColor(readProp(styleObjects, "kpiStyle", `complement${i}FontColor`)),
@@ -147,10 +147,8 @@ function complementSlots(
     complements: MeasureRef[],
 ): ComplementSlot[] {
     const byQuery = new Map(complements.map((c) => [c.queryName, c]));
-    const kpiStyle = styleObjects?.kpiStyle as Record<string, unknown> | undefined;
-    const hasExplicitKpiStyle = Boolean(kpiStyle);
 
-    const fromObjects = ([1, 2, 3, 4] as const).map((i) => {
+    const fromObjects = ACTIVE_SLOT_INDEXES.map((i) => {
         const q = normalizeComplementQueryName(
             asText(readProp(styleObjects, "kpiStyle", `complement${i}`)),
         );
@@ -159,23 +157,26 @@ function complementSlots(
     });
 
     const fromJson = (mappingEntry?.complements ?? [])
-        .map((queryName, idx) => ({
-            slotIndex: (Math.min(idx + 1, 4) as 1 | 2 | 3 | 4),
-            queryName: normalizeComplementQueryName(queryName),
-            label: "",
-            ...readSlotStyle(undefined, (Math.min(idx + 1, 4) as 1 | 2 | 3 | 4)),
-        }))
+        .slice(0, ACTIVE_SLOT_INDEXES.length)
+        .map((queryName, idx) => {
+            const slotIndex: ComplementSlotIndex = idx === 1 ? 2 : 1;
+            return {
+                slotIndex,
+                queryName: normalizeComplementQueryName(queryName),
+                label: "",
+                ...readSlotStyle(undefined, slotIndex),
+            };
+        })
         .filter((slot) => slot.queryName);
 
-    const source = hasExplicitKpiStyle
-        ? fromObjects.filter((s) => s.queryName)
-        : fromObjects.some((s) => s.queryName)
-          ? fromObjects.filter((s) => s.queryName)
-          : fromJson;
+    // Se o usuário já configurou título/largura (kpiStyle existe) mas ainda não
+    // escolheu medidas de complemento, não descartar o mapeamento JSON legado.
+    const fromObjectsFiltered = fromObjects.filter((s) => s.queryName);
+    const source = fromObjectsFiltered.length ? fromObjectsFiltered : fromJson;
 
     const seen = new Set<string>();
     const slots: ComplementSlot[] = [];
-    for (const item of source.slice(0, 4)) {
+    for (const item of source.slice(0, ACTIVE_SLOT_INDEXES.length)) {
         if (seen.has(item.queryName) || !byQuery.has(item.queryName)) {
             continue;
         }

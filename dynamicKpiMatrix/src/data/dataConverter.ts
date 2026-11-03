@@ -151,11 +151,9 @@ function buildCell(
     };
 
     const valueObjects = readValueObjects(node, column.valueSourceIndex);
-    const everyValueObjects = node?.values
-        ? Object.values(node.values as Record<string, MatrixValueEntry>)
-              .map((entry) => entry?.objects)
-              .filter((objects): objects is powerbi.DataViewObjects => Boolean(objects))
-        : [];
+    // Fontes de CF por complemento: objects da própria medida do slot.
+    // O nó da categoria (node.objects) recebe regras com selector ["category"].
+    // Não misturar objects de outras medidas — cada slot tem propriedades próprias.
     const complementSources = column.complements.map((slot) => {
         const measure = measures.find((m) => m.queryName === slot.queryName);
         const idx = measure?.valueSourceIndex ?? -1;
@@ -165,7 +163,7 @@ function buildCell(
         cell,
         column,
         valueObjects,
-        [node?.objects, ...everyValueObjects],
+        [node?.objects],
         complementSources,
     );
     return applyConditionalColors(cell, column);
@@ -285,11 +283,26 @@ function toRow(
     };
 }
 
-function nodeHasAnyValue(node: DataViewMatrixNode | undefined, columns: KpiColumnConfig[]): boolean {
+function nodeHasAnyValue(
+    node: DataViewMatrixNode | undefined,
+    columns: KpiColumnConfig[],
+    measures: MeasureRef[] = [],
+): boolean {
     if (!node?.values) {
         return false;
     }
-    return columns.some((col) => readMatrixValue(node, col.valueSourceIndex) != null);
+    const hasPrimary = columns.some((col) => readMatrixValue(node, col.valueSourceIndex) != null);
+    if (hasPrimary) {
+        return true;
+    }
+    // Total Geral também é válido quando só os complementos têm valor no subtotal.
+    return columns.some((col) =>
+        col.complements.some((slot) => {
+            const measure = measures.find((m) => m.queryName === slot.queryName);
+            const idx = measure?.valueSourceIndex ?? -1;
+            return idx >= 0 && readMatrixValue(node, idx) != null;
+        }),
+    );
 }
 
 function sumTotalFromRows(
@@ -433,8 +446,9 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
 
     let totalRow: MatrixRow | undefined;
     if (options.showTotal) {
-        const subtotalNode = totalNodes.find((n) => nodeHasAnyValue(n, columns)) ?? totalNodes[0];
-        if (subtotalNode && nodeHasAnyValue(subtotalNode, columns)) {
+        const subtotalNode =
+            totalNodes.find((n) => nodeHasAnyValue(n, columns, measures)) ?? totalNodes[0];
+        if (subtotalNode && nodeHasAnyValue(subtotalNode, columns, measures)) {
             totalRow = toRow(
                 subtotalNode,
                 -1,
@@ -447,7 +461,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
                 options.grandTotalDisplayMode,
                 true,
             );
-        } else if (root && nodeHasAnyValue(root, columns)) {
+        } else if (root && nodeHasAnyValue(root, columns, measures)) {
             totalRow = toRow(
                 root,
                 -1,

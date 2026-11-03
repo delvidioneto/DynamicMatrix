@@ -1,6 +1,6 @@
 {
   "name": "dynamic-kpi-matrix",
-  "description": "Matriz dinâmica de KPIs para Power BI — células com valor principal e até quatro complementos",
+  "description": "Matriz dinâmica de KPIs para Power BI — células com valor principal e até dois complementos configuráveis",
   "version": "1.5.0.0",
   "author": {
     "name": "Delvidio Demarchi Neto",

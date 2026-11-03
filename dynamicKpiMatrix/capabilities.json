@@ -299,9 +299,7 @@
                     "type": {
                         "enumeration": [
                             { "value": "1", "displayName": "Complemento 1" },
-                            { "value": "2", "displayName": "Complemento 2" },
-                            { "value": "3", "displayName": "Complemento 3" },
-                            { "value": "4", "displayName": "Complemento 4" }
+                            { "value": "2", "displayName": "Complemento 2" }
                         ]
                     }
                 },
@@ -397,6 +395,20 @@
                 "complement2DataBarColor": { "displayName": "Cor da barra 2", "type": { "fill": { "solid": { "color": true } } } },
                 "complement3DataBarColor": { "displayName": "Cor da barra 3", "type": { "fill": { "solid": { "color": true } } } },
                 "complement4DataBarColor": { "displayName": "Cor da barra 4", "type": { "fill": { "solid": { "color": true } } } },
+                "complement1DataBarColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement1DataBarColor", "selector": ["category"] }
+                    }
+                },
+                "complement2DataBarColorRule": {
+                    "type": { "fillRule": {} },
+                    "rule": {
+                        "inputRole": "complements",
+                        "output": { "property": "complement2DataBarColor", "selector": ["category"] }
+                    }
+                },
                 "complement1Icons": {
                     "displayName": "Ícones 1",
                     "type": {

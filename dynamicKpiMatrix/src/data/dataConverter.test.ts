@@ -100,6 +100,27 @@ function assert(condition: unknown, message: string): asserts condition {
 
     const synced = syncMappingJson(columns);
     assert(synced.includes("comp1"), "sync mapping json");
+
+    // kpiStyle só com título não pode apagar o mapeamento JSON dos complementos
+    const colObjectsTitleOnly = new Map<string, powerbi.DataViewObjects | undefined>();
+    colObjectsTitleOnly.set("kpiA", {
+        kpiStyle: { title: "Billing", layout: "horizontal" },
+    } as powerbi.DataViewObjects);
+    const columnsFromJson = buildKpiColumns(
+        measures,
+        {
+            kpiMapping: {
+                mappingJson: JSON.stringify({
+                    kpiA: { complements: ["comp1", "comp2"] },
+                }),
+            },
+        } as powerbi.DataViewObjects,
+        colObjectsTitleOnly,
+    );
+    assert(columnsFromJson[0].complements.length === 2, "JSON complements kept when kpiStyle has no measures");
+    assert(columnsFromJson[0].complements[0].queryName === "comp1", "JSON slot 1");
+    assert(columnsFromJson[0].complements[1].queryName === "comp2", "JSON slot 2");
+    assert(columnsFromJson[0].editingComplementSlot === 1, "default editing slot is 1");
 }
 
 // --- conditional formatting ---
@@ -249,7 +270,84 @@ function assert(condition: unknown, message: string): asserts condition {
     });
     assert(view.totalRow, "fallback total exists");
     assert(view.totalRow!.cells[0].primary.raw === 25, `sum primary got ${view.totalRow!.cells[0].primary.raw}`);
+    assert(view.totalRow!.cells[0].complements.length === 1, "total keeps complement slot");
     assert(view.totalRow!.cells[0].complements[0].value.raw == null, "percent complement is not summed");
+    assert(view.totalRow!.cells[0].complements[0].label === "IBP", "total complement keeps label");
+}
+
+// Total Geral: complementos vêm do subtotal DAX (contexto de total)
+{
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    children: [
+                        {
+                            isSubtotal: true,
+                            values: {
+                                0: { value: 100 },
+                                1: { value: 0.55 },
+                                2: { value: 0.8 },
+                            },
+                        },
+                        {
+                            value: "A",
+                            values: {
+                                0: { value: 40 },
+                                1: { value: 0.4 },
+                                2: { value: 0.7 },
+                            },
+                        },
+                        {
+                            value: "B",
+                            values: {
+                                0: { value: 60 },
+                                1: { value: 0.6 },
+                                2: { value: 0.9 },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Delivery", roles: { kpis: true } },
+                { queryName: "ibp", displayName: "IBP %", roles: { complements: true }, format: "0%" },
+                { queryName: "quota", displayName: "Quota %", roles: { complements: true }, format: "0%" },
+            ],
+        },
+        metadata: {
+            columns: [
+                {
+                    queryName: "kpiA",
+                    roles: { kpis: true },
+                    objects: {
+                        kpiStyle: {
+                            complement1: "ibp",
+                            complement2: "quota",
+                            complement1Label: "IBP",
+                            complement2Label: "Quota",
+                            editingComplementSlot: "2",
+                        },
+                    },
+                },
+                { queryName: "ibp", roles: { complements: true } },
+                { queryName: "quota", roles: { complements: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total Geral",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: true,
+    });
+    assert(view.columns[0].editingComplementSlot === 2, "editing slot persisted per KPI");
+    assert(view.totalRow, "total from subtotal");
+    assert(view.totalRow!.cells[0].complements.length === 2, "total has both complements");
+    assert(view.totalRow!.cells[0].complements[0].value.raw === 0.55, "total complement 1 from DAX");
+    assert(view.totalRow!.cells[0].complements[1].value.raw === 0.8, "total complement 2 from DAX");
+    assert(view.rows[0].cells[0].complements[0].value.raw === 0.4, "row complement independent");
 }
 
 // Indicador percentual: a chave da célula não é o índice da medida
@@ -534,6 +632,74 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(rowA!.cells[0].complements[0].fontColor === "#F5A623", "rule color from row objects");
     assert(rowA!.cells[0].complements[0].value.text.startsWith("7"), "7% display");
     assert(rowB!.cells[0].complements[0].fontColor === "#107C10", "rule color from complement value");
+}
+
+// Formatação condicional independente por complemento (slots 1 e 2)
+{
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    children: [
+                        {
+                            value: "A",
+                            objects: {
+                                kpiStyle: {
+                                    complement1FontColor: { solid: { color: "#AA0000" } },
+                                    complement2FontColor: { solid: { color: "#00AA00" } },
+                                    complement1BackColor: { solid: { color: "#FFEEEE" } },
+                                    complement2DataBarColor: { solid: { color: "#0000AA" } },
+                                },
+                            },
+                            values: {
+                                0: { value: 10 },
+                                1: { value: 0.4 },
+                                2: { value: 0.9 },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Delivery", roles: { kpis: true } },
+                { queryName: "c1", displayName: "IBP", roles: { complements: true }, format: "0%" },
+                { queryName: "c2", displayName: "Quota", roles: { complements: true }, format: "0%" },
+            ],
+        },
+        metadata: {
+            columns: [
+                {
+                    queryName: "kpiA",
+                    roles: { kpis: true },
+                    objects: {
+                        kpiStyle: {
+                            complement1: "c1",
+                            complement2: "c2",
+                            complement1FontColor: { solid: { color: "#111111" } },
+                            complement2FontColor: { solid: { color: "#222222" } },
+                            complement2DataBars: true,
+                        },
+                    },
+                },
+                { queryName: "c1", roles: { complements: true } },
+                { queryName: "c2", roles: { complements: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: false,
+    });
+    const comps = view.rows[0].cells[0].complements;
+    assert(comps[0].fontColor === "#AA0000", "slot 1 font from its own rule");
+    assert(comps[1].fontColor === "#00AA00", "slot 2 font from its own rule");
+    assert(comps[0].backColor === "#FFEEEE", "slot 1 back color independent");
+    assert(comps[1].dataBarColor === "#0000AA", "slot 2 bar color independent");
+    assert(comps[0].dataBars !== true, "slot 1 bars stay off");
+    assert(comps[1].dataBars === true, "slot 2 bars stay on");
 }
 
 // Total Geral: a medida volta em branco no subtotal e o SVG só existe na linha

@@ -2,7 +2,7 @@
 
 import powerbi from "powerbi-visuals-api";
 import { dataViewWildcard } from "powerbi-visuals-utils-dataviewutils";
-import type { ComplementSlot, KpiColumnConfig } from "../data/viewModel";
+import type { ComplementSlot, ComplementSlotIndex, KpiColumnConfig } from "../data/viewModel";
 import { NONE_COMPLEMENT } from "../data/kpiMapper";
 
 const LAYOUT_ITEMS: powerbi.IEnumMember[] = [
@@ -18,12 +18,18 @@ const ICON_ITEMS: powerbi.IEnumMember[] = [
     { value: "triangles", displayName: "Triângulos" },
 ];
 
-type SlotIndex = 1 | 2 | 3 | 4;
+const SLOT_ITEMS: powerbi.IEnumMember[] = [
+    { value: "1", displayName: "Complemento 1" },
+    { value: "2", displayName: "Complemento 2" },
+];
 
-const SLOT_INDEXES: SlotIndex[] = [1, 2, 3, 4];
-
-function slotConfig(col: KpiColumnConfig, slot: SlotIndex): ComplementSlot | undefined {
+function slotConfig(col: KpiColumnConfig, slot: ComplementSlotIndex): ComplementSlot | undefined {
     return col.complements.find((c) => c.slotIndex === slot);
+}
+
+function activeSlot(col: KpiColumnConfig): ComplementSlotIndex {
+    const n = Number(col.editingComplementSlot ?? 1);
+    return n === 2 ? 2 : 1;
 }
 
 function textSlice(
@@ -159,87 +165,95 @@ function colorCfSlice(
     };
 }
 
-function buildComplementGroup(
+/**
+ * Painel único de Complemento: o seletor escolhe o slot 1 ou 2.
+ * As propriedades persistidas são sempre `complement${slot}*`, então alternar
+ * o seletor não sobrescreve o outro complemento.
+ */
+function buildComplementSlices(
     index: number,
     q: string,
-    slot: SlotIndex,
+    slot: ComplementSlotIndex,
     active: ComplementSlot | undefined,
     fallbackFontSize: number,
     complementItems: powerbi.IEnumMember[],
-): powerbi.visuals.FormattingGroup {
+): powerbi.visuals.FormattingSlice[] {
     const prefix = `kpi_${index}_s${slot}`;
-    return {
-        displayName: `Complemento ${slot}`,
-        uid: `kpi_${index}_comp${slot}_uid`,
-        collapsible: true,
-        slices: [
-            dropdownSlice(
-                `${prefix}_measure`,
-                "Medida",
-                `complement${slot}`,
-                active?.queryName || NONE_COMPLEMENT,
-                complementItems,
-                q,
-            ),
-            textSlice(
-                `${prefix}_label`,
-                "Rótulo",
-                `complement${slot}Label`,
-                active?.label ?? "",
-                q,
-            ),
-            numSlice(
-                `${prefix}_fs`,
-                "Tamanho da fonte",
-                `complement${slot}FontSize`,
-                active?.fontSize ?? fallbackFontSize,
-                q,
-            ),
-            colorCfSlice(
-                `${prefix}_fc`,
-                "Cor da fonte",
-                `complement${slot}FontColor`,
-                active?.fontColor ?? "#4A4A4A",
-                q,
-            ),
-            colorCfSlice(
-                `${prefix}_bg`,
-                "Cor de fundo",
-                `complement${slot}BackColor`,
-                active?.backColor ?? "#FFFFFF",
-                q,
-            ),
-            toggleSlice(
-                `${prefix}_bars`,
-                "Barras de dados",
-                `complement${slot}DataBars`,
-                active?.dataBars ?? false,
-                q,
-            ),
-            colorCfSlice(
-                `${prefix}_barc`,
-                "Cor da barra",
-                `complement${slot}DataBarColor`,
-                active?.dataBarColor ?? "#118DFF",
-                q,
-            ),
-            dropdownSlice(
-                `${prefix}_icons`,
-                "Ícones",
-                `complement${slot}Icons`,
-                active?.icons ?? "none",
-                ICON_ITEMS,
-                q,
-            ),
-            textSlice(
-                `${prefix}_url`,
-                "URL da web",
-                `complement${slot}WebUrl`,
-                active?.webUrl ?? "",
-                q,
-            ),
-        ],
-    };
+    return [
+        dropdownSlice(
+            `${prefix}_slot`,
+            "Complemento",
+            "editingComplementSlot",
+            String(slot),
+            SLOT_ITEMS,
+            q,
+        ),
+        dropdownSlice(
+            `${prefix}_measure`,
+            "Medida",
+            `complement${slot}`,
+            active?.queryName || NONE_COMPLEMENT,
+            complementItems,
+            q,
+        ),
+        textSlice(
+            `${prefix}_label`,
+            "Rótulo",
+            `complement${slot}Label`,
+            active?.label ?? "",
+            q,
+        ),
+        numSlice(
+            `${prefix}_fs`,
+            "Tamanho da fonte",
+            `complement${slot}FontSize`,
+            active?.fontSize ?? fallbackFontSize,
+            q,
+        ),
+        colorCfSlice(
+            `${prefix}_fc`,
+            "Cor da fonte",
+            `complement${slot}FontColor`,
+            active?.fontColor ?? "#4A4A4A",
+            q,
+        ),
+        colorCfSlice(
+            `${prefix}_bg`,
+            "Cor de fundo",
+            `complement${slot}BackColor`,
+            active?.backColor ?? "#FFFFFF",
+            q,
+        ),
+        toggleSlice(
+            `${prefix}_bars`,
+            "Barras de dados",
+            `complement${slot}DataBars`,
+            active?.dataBars ?? false,
+            q,
+        ),
+        colorCfSlice(
+            `${prefix}_barc`,
+            "Cor da barra",
+            `complement${slot}DataBarColor`,
+            active?.dataBarColor ?? "#118DFF",
+            q,
+        ),
+        dropdownSlice(
+            `${prefix}_icons`,
+            "Ícones",
+            `complement${slot}Icons`,
+            active?.icons ?? "none",
+            ICON_ITEMS,
+            q,
+        ),
+        textSlice(
+            `${prefix}_url`,
+            "URL da web",
+            `complement${slot}WebUrl`,
+            active?.webUrl ?? "",
+            q,
+        ),
+    ];
 }
 
 export function buildKpiContainerCard(
@@ -262,6 +276,7 @@ export function buildKpiContainerCard(
                 ? col.layout
                 : "vertical";
         const fallbackFontSize = col.complementFontSize ?? 11;
+        const slot = activeSlot(col);
 
         return {
             displayName: col.title || col.displayName,
@@ -318,8 +333,11 @@ export function buildKpiContainerCard(
                         ),
                     ],
                 },
-                ...SLOT_INDEXES.map((slot) =>
-                    buildComplementGroup(
+                {
+                    displayName: "Complemento",
+                    uid: `kpi_${index}_compGroup_uid`,
+                    collapsible: true,
+                    slices: buildComplementSlices(
                         index,
                         q,
                         slot,
@@ -327,7 +345,7 @@ export function buildKpiContainerCard(
                         fallbackFontSize,
                         complementItems,
                     ),
-                ),
+                },
             ],
         };
     });
