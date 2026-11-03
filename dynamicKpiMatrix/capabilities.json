@@ -86,6 +86,10 @@
                         ]
                     }
                 },
+                "showRightBorder": {
+                    "displayName": "Borda direita",
+                    "type": { "bool": true }
+                },
                 "sortMode": {
                     "type": {
                         "enumeration": [
@@ -249,6 +253,10 @@
                 },
                 "verticalBorderCustomHeight": {
                     "displayName": "Altura personalizada (px)",
+                    "type": { "numeric": true }
+                },
+                "borderPadding": {
+                    "displayName": "Espaçamento da borda",
                     "type": { "numeric": true }
                 },
                 "borderColor": { "displayName": "Cor da borda", "type": { "fill": { "solid": { "color": true } } } },

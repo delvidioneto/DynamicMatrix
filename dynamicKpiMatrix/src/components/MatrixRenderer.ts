@@ -302,7 +302,10 @@ function categoryCellHtml(
     categoryColWidth: number,
 ): string {
     const iconSource = pickCategoryImageSource(row, style, isTotal);
-    const preferredSize = isTotal ? style.grandTotalImageSize : style.imageSize;
+    // Mesma regra visual das categorias: tamanho/posição de imagem + fill em modo imagem.
+    const preferredSize = isTotal
+        ? style.grandTotalImageSize || style.imageSize
+        : style.imageSize;
     const mode = resolveCategoryDisplayMode(row, style, isTotal);
     const fillCell = mode === "image";
     const icon = imageHtml(iconSource, preferredSize, "dkm-icon", categoryColWidth, fillCell);
@@ -397,6 +400,10 @@ function kpiCellHtml(
     const hasRight = Boolean(style.valueBorderRight);
     const hasTop = Boolean(style.valueBorderTop);
     const hasBottom = Boolean(style.valueBorderBottom);
+    const anyBorder = hasLeft || hasRight || hasTop || hasBottom;
+    // Espaço entre borda e valor (padrão 2px, ajustável em Valores).
+    const borderPad = Math.max(0, style.valueBorderPadding ?? 2);
+    const contentPad = anyBorder ? borderPad : pad;
     const vHeightMode = style.valueVerticalBorderHeight || "full";
     // Bordas L/R "completas" no container; content/custom usam outro mecanismo.
     const verticalOnShell = vHeightMode === "full";
@@ -415,12 +422,13 @@ function kpiCellHtml(
         `border-right-width:${hasRight ? bw : 0}px;` +
         `border-top-width:0;` +
         `border-bottom-width:0;` +
-        `border-radius:${br}px;`;
+        `border-radius:${br}px;` +
+        `padding:${borderPad}px;`;
 
     // Cada complemento ocupa uma fração da largura do indicador
     // (ex.: célula 160px com 2 complementos → 80px cada).
     const visibleComps = cell.complements.filter((c) => c.value.text || c.label);
-    const slotWidth = complementSlotWidth(cellWidthPx, visibleComps.length, pad, layout);
+    const slotWidth = complementSlotWidth(cellWidthPx, visibleComps.length, contentPad, layout);
     const slotCss =
         layout === "horizontal" && visibleComps.length > 1
             ? `flex:0 0 ${slotWidth}px;width:${slotWidth}px;max-width:${slotWidth}px;`
@@ -461,8 +469,11 @@ function kpiCellHtml(
     const bodyHtml = primary + (comps ? `<div class="dkm-comps">${comps}</div>` : "");
     const alignItems =
         align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
+    // No modo "content", o espaçamento fica no frame (junto às bordas L/R).
+    const shellPad =
+        vHeightMode === "content" && (hasLeft || hasRight) ? Math.max(pad, 0) : contentPad;
     const shellBase =
-        `background:${bg};padding:${pad}px;text-align:${align};` +
+        `background:${bg};padding:${shellPad}px;text-align:${align};` +
         `align-items:${alignItems};${outerBorderCss}`;
 
     // Personalizada: barras absolutas centralizadas (não afetam layout do valor).
@@ -584,7 +595,7 @@ export function buildMatrixHtml(view: VisualViewModel, style: ResolvedVisualStyl
 
     // Cabeçalho + Total Geral ficam em bloco sticky no topo (sempre visíveis).
     return (
-        `<div class="dkm-root" style="font-family:${esc(style.fontFamily)},Segoe UI,Arial,sans-serif;background:${style.background};color:${style.fontColor};font-size:${style.fontSize}px;--cat-width:${catWidthPx}px;--grid-cols:${templateColumns};--header-bg:${style.headerBackground};--total-bg:${style.grandTotalBackground};--col-bg:${style.columnBackground};--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${style.columnBorderRadius}px;--col-gap:${style.columnGap}px;--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${style.rowBorderRadius}px">` +
+        `<div class="dkm-root" style="font-family:${esc(style.fontFamily)},Segoe UI,Arial,sans-serif;background:${style.background};color:${style.fontColor};font-size:${style.fontSize}px;--cat-width:${catWidthPx}px;--cat-border-width:${style.categoryShowRightBorder ? Math.max(style.columnBorderWidth || 1, 1) : 0}px;--cat-border-color:${style.columnBorderColor};--grid-cols:${templateColumns};--header-bg:${style.headerBackground};--total-bg:${style.grandTotalBackground};--col-bg:${style.columnBackground};--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${style.columnBorderRadius}px;--col-gap:${style.columnGap}px;--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${style.rowBorderRadius}px">` +
         `<div class="dkm-scroll">` +
         `<div class="dkm-freeze">` +
         `<div class="dkm-grid dkm-grid-freeze" style="grid-template-columns:${templateColumns};column-gap:${style.columnGap}px">` +

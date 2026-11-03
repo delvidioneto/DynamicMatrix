@@ -279,8 +279,9 @@ export function buildKpiContainerCard(
             uid: `kpi_item_${index}_uid`,
             groups: [
                 {
-                    displayName: "KPI",
-                    uid: `kpi_${index}_kpiGroup_uid`,
+                    displayName: "Coluna",
+                    uid: `kpi_${index}_colGroup_uid`,
+                    collapsible: true,
                     slices: [
                         textSlice(`kpi_${index}_title`, "Título", "title", col.title, q),
                         dropdownSlice(
@@ -298,6 +299,13 @@ export function buildKpiContainerCard(
                             col.columnWidth,
                             q,
                         ),
+                    ],
+                },
+                {
+                    displayName: "Valor principal",
+                    uid: `kpi_${index}_primaryGroup_uid`,
+                    collapsible: true,
+                    slices: [
                         numSlice(
                             `kpi_${index}_ps`,
                             "Fonte principal",
@@ -322,8 +330,9 @@ export function buildKpiContainerCard(
                     ],
                 },
                 {
-                    displayName: "Complementos",
+                    displayName: "Complemento",
                     uid: `kpi_${index}_compGroup_uid`,
+                    collapsible: true,
                     slices: [
                         dropdownSlice(
                             `kpi_${index}_slot`,
@@ -355,6 +364,13 @@ export function buildKpiContainerCard(
                             col.complementFontSize ?? 11,
                             q,
                         ),
+                    ],
+                },
+                {
+                    displayName: "Formatação",
+                    uid: `kpi_${index}_fmtGroup_uid`,
+                    collapsible: true,
+                    slices: [
                         dropdownSlice(
                             `kpi_${index}_el`,
                             "Elemento da célula",

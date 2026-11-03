@@ -62,14 +62,14 @@ Principais cards no painel **Formato**:
 
 | Card | Para quê |
 | --- | --- |
-| **Aparência Geral** | Fonte, fundo e tipografia base |
-| **Categorias** | **Geral**: largura, tipografia, tamanho/posição da imagem, ordenação. **Imagens**: por categoria — Exibição (texto / imagem / ambos), Texto e SVG |
-| **Valores** | Tamanho, cor, alinhamento, **unidades de exibição** (Automático / Nenhum / Milhares / Milhões / Bilhões / Trilhões), casas decimais e **bordas por lado** (esquerda, direita, cima, baixo) no bloco valor + complementos |
-| **Total Geral** | Exibir/ocultar, **Exibição** (texto / imagem / ambos), Texto, SVG, estilo da linha |
-| **Cabeçalho** | Estilo dos títulos das colunas |
-| **Linhas** | Zebra, cores, borda da linha, altura e espaçamento |
-| **Colunas** | Fundo, **ligar/desligar borda** da grade, largura e espaçamento entre colunas |
-| **Indicadores por KPI** | Título, layout e complementos **por coluna de valor** |
+| **Aparência do visual** | **Tipografia** e **Contêiner** (fundo) |
+| **Cabeçalho** | **Texto** e **Fundo** dos títulos das colunas |
+| **Categorias** | **Coluna**, **Texto**, **Ícone** e **Por categoria** (exibição, texto e SVG) |
+| **Valores** | **Texto**, **Número** (unidades e casas decimais) e **Borda** por lado |
+| **Indicadores por KPI** | Por coluna: **Coluna**, **Valor principal**, **Complemento** e **Formatação** |
+| **Linhas** | **Fundo** (zebra), **Borda** e **Tamanho** |
+| **Colunas** | **Medidas**, **Fundo** e **Borda** |
+| **Total Geral** | **Conteúdo**, **Texto**, **Célula** e **Ícone** |
 | **Subtotais** | Solicitar subtotal DAX e posição (topo/base) |
 | **Tooltip** | Liga/desliga tooltip na coluna de categorias |
 
@@ -82,7 +82,7 @@ Se o host não enviar subtotal, o visual faz fallback pela soma das linhas visí
 ### 5. Imagens (SVG via medida DAX)
 
 1. Arraste uma ou mais medidas que retornam SVG para o well **SVG** no painel Dados.
-2. **Categorias → Imagens**: selecione a categoria → escolha **Exibição** → preencha **Texto** e/ou **SVG** conforme o modo. Cada categoria é independente; o texto customizado não altera a identidade usada em filtros/seleção.
+2. **Categorias → Por categoria**: selecione a categoria → escolha **Exibição** → preencha **Texto** e/ou **SVG** conforme o modo. Cada categoria é independente; o texto customizado não altera a identidade usada em filtros/seleção.
 3. **Total Geral**: **Exibição** primeiro → **Texto** e/ou **SVG** (medida avaliada no contexto do total).
 
 SVGs são sanitizados (scripts, eventos e URLs externas removidos) e cabem na célula sem distorção (`object-fit: contain`).

@@ -7,8 +7,8 @@
 3. Arraste medidas auxiliares para **Informações complementares** (ex.: Billing IBP %, Billing Quota %).
 4. (Opcional) Arraste medidas DAX que retornam código SVG para o well **SVG**.
 5. Abra **Formatar visual → Indicadores por KPI**.
-6. Para cada valor, escolha até 4 complementos (medida + rótulo) e o elemento da célula (fonte, fundo, barras, ícones, URL).
-7. Em **Valores**, ajuste tamanho, alinhamento, unidades de exibição e bordas por lado do card.
+6. Para cada valor, em **Complemento** escolha até 4 medidas e, em **Formatação**, o elemento da célula (fonte, fundo, barras, ícones, URL).
+7. Em **Valores**, ajuste **Texto**, **Número** e **Borda** do bloco valor + complementos.
 
 ## Exemplo de mapeamento
 
@@ -20,14 +20,14 @@
 
 ## Ordenação
 
-Em **Categorias → Geral**:
+Em **Categorias → Coluna**:
 
 - Ordem dos dados
 - Alfabética A–Z / Z–A
 
 ## Imagens por categoria
 
-1. Em **Categorias → Imagens**, selecione a **Categoria** no dropdown.
+1. Em **Categorias → Por categoria**, selecione a **Categoria** no dropdown.
 2. Escolha a **Exibição**:
    - **Somente texto** — informe o **Texto** (substitui só a apresentação; a identidade da categoria para filtro/seleção permanece).
    - **Somente imagem** — escolha a medida no campo **SVG** (medida do well **SVG**).

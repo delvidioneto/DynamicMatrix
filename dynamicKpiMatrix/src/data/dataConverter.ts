@@ -161,6 +161,38 @@ function buildCell(
     return applyConditionalColors(cell, column);
 }
 
+/** Localiza medida SVG por queryName ou displayName (mesmo padrão das categorias). */
+function findIconMeasure(
+    measures: MeasureRef[],
+    preferredQueryName: string | undefined,
+): MeasureRef | undefined {
+    const icons = measures.filter((m) => m.role === "categoryIcon");
+    if (!icons.length) {
+        return undefined;
+    }
+    const preferred = (preferredQueryName || "").trim();
+    if (!preferred) {
+        return undefined;
+    }
+    return (
+        icons.find((m) => m.queryName === preferred) ||
+        icons.find((m) => m.displayName === preferred) ||
+        icons.find(
+            (m) =>
+                m.queryName.endsWith(preferred) ||
+                m.queryName.includes(`[${preferred}]`) ||
+                m.displayName.toLowerCase() === preferred.toLowerCase(),
+        )
+    );
+}
+
+function readIconRaw(node: DataViewMatrixNode | undefined, measure: MeasureRef | undefined): string {
+    if (!node || !measure) {
+        return "";
+    }
+    return unwrapMeasureText(String(readMatrixValue(node, measure.valueSourceIndex) ?? ""));
+}
+
 function resolveRowIconMeasure(
     metaMap: CategoryMetaMap,
     category: string,
@@ -168,23 +200,11 @@ function resolveRowIconMeasure(
     measures: MeasureRef[],
     totalIconQueryName?: string,
 ): MeasureRef | undefined {
-    const icons = measures.filter((m) => m.role === "categoryIcon");
-    if (!icons.length) {
-        return undefined;
-    }
     if (isTotal) {
-        const preferred = (totalIconQueryName || "").trim();
-        if (!preferred) {
-            return undefined;
-        }
-        return icons.find((m) => m.queryName === preferred);
+        return findIconMeasure(measures, totalIconQueryName);
     }
     const meta = findCategoryMeta(metaMap, category);
-    const preferred = (meta?.iconQueryName || "").trim();
-    if (!preferred) {
-        return undefined;
-    }
-    return icons.find((m) => m.queryName === preferred);
+    return findIconMeasure(measures, meta?.iconQueryName);
 }
 
 function toRow(
@@ -209,9 +229,7 @@ function toRow(
         measures,
         totalIconQueryName,
     );
-    const iconRaw = iconMeasure
-        ? unwrapMeasureText(String(readMatrixValue(node, iconMeasure.valueSourceIndex) ?? ""))
-        : "";
+    const iconRaw = readIconRaw(node, iconMeasure);
     const tooltips = measures.filter((m) => m.role === "tooltips");
     const customTitle = meta?.title?.trim();
     const displayMode: DisplayMode = isTotal
@@ -412,6 +430,15 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             totalRow.displayTitle = options.totalLabel;
             totalRow.displayMode = options.grandTotalDisplayMode || "both";
             totalRow.isTotal = true;
+
+            // Mesma regra das categorias: medida SVG escolhida, avaliada no contexto do total.
+            // Tenta subtotal e root (hosts variam onde enviam o valor da medida de ícone).
+            const totalIcon = findIconMeasure(measures, options.grandTotalIconQueryName);
+            if (totalIcon) {
+                const fromSub = readIconRaw(subtotalNode, totalIcon);
+                const fromRoot = readIconRaw(root, totalIcon);
+                totalRow.iconRaw = fromSub || fromRoot || totalRow.iconRaw || "";
+            }
         }
     }
 

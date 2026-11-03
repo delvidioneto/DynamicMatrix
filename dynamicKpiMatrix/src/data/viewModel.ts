@@ -146,6 +146,8 @@ export interface ResolvedVisualStyle {
     categoryAlignment: Align;
     imageSize: number;
     imagePlacement: ImagePlacement;
+    /** Borda direita da coluna de categorias. */
+    categoryShowRightBorder: boolean;
     categoryImageType: ImageSourceType;
     sortMode: SortMode;
     grandTotalShow: boolean;
@@ -187,6 +189,8 @@ export interface ResolvedVisualStyle {
     /** Completa | Somente área do valor | Personalizada — só L/R. */
     valueVerticalBorderHeight: VerticalBorderHeight;
     valueVerticalBorderCustomHeight: number;
+    /** Espaço entre a borda e o conteúdo do valor (px). */
+    valueBorderPadding: number;
     valueBorderColor: string;
     valueBorderWidth: number;
     valueBorderRadius: number;
@@ -220,6 +224,7 @@ export const defaultStyle: ResolvedVisualStyle = {
     categoryAlignment: "left",
     imageSize: 22,
     imagePlacement: "left",
+    categoryShowRightBorder: true,
     categoryImageType: "svg",
     sortMode: "data",
     grandTotalShow: true,
@@ -259,6 +264,7 @@ export const defaultStyle: ResolvedVisualStyle = {
     valueBorderBottom: false,
     valueVerticalBorderHeight: "full",
     valueVerticalBorderCustomHeight: 24,
+    valueBorderPadding: 2,
     valueBorderColor: "#D0D0D0",
     valueBorderWidth: 1,
     valueBorderRadius: 0,

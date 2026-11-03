@@ -377,6 +377,49 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(!noIcon.totalRow!.iconRaw, "no total icon without selection");
 }
 
+// Total Geral: SVG no root quando o subtotal não traz a medida de ícone
+{
+    const svgTotal = "<svg id='root-total'><circle r='2'/></svg>";
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    values: {
+                        0: { value: 100 },
+                        1: { value: svgTotal },
+                    },
+                    children: [
+                        { value: "A", values: { 0: { value: 40 }, 1: { value: "" } } },
+                        { value: "B", values: { 0: { value: 60 }, 1: { value: "" } } },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Billing", roles: { kpis: true } },
+                { queryName: "svgTotal", displayName: "SVG Total", roles: { categoryIcon: true } },
+            ],
+        },
+        metadata: {
+            columns: [
+                { queryName: "kpiA", roles: { kpis: true } },
+                { queryName: "svgTotal", roles: { categoryIcon: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total Geral",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: true,
+        grandTotalIconQueryName: "svgTotal",
+        grandTotalDisplayMode: "image",
+    });
+    assert(view.totalRow, "total from root values");
+    assert(view.totalRow!.iconRaw.includes("id='root-total'"), "total svg from root node");
+    assert(view.totalRow!.displayMode === "image", "total image-only mode");
+}
+
 // --- renderer ---
 {
     const html = buildMatrixHtml(

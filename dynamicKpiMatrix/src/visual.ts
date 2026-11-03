@@ -15,6 +15,7 @@ import ISelectionId = powerbi.visuals.ISelectionId;
 
 import { VisualFormattingSettingsModel } from "./settings";
 import { convertDataView } from "./data/dataConverter";
+import { collectMeasures } from "./data/kpiMapper";
 import { buildMatrixHtml, parseCellTooltip } from "./components/MatrixRenderer";
 import { buildKpiContainerCard } from "./services/KpiFormattingModel";
 import type { VisualViewModel } from "./data/viewModel";
@@ -89,6 +90,27 @@ export class Visual implements IVisual {
             this.syncCategoryEditorState();
             this.persistImageProperties();
 
+            // Sincroniza itens do dropdown SVG ANTES do convert (senão o Total perde a medida
+            // escolhida — o populate roda com items vazios e zera o ItemDropdown).
+            const earlyIcons = collectMeasures(dataView?.matrix?.valueSources)
+                .filter((m) => m.role === "categoryIcon")
+                .map((m) => ({ queryName: m.queryName, displayName: m.displayName }));
+            const gtObjects = dataView?.metadata?.objects?.grandTotal as
+                | { iconMeasure?: unknown }
+                | undefined;
+            const persistedGtIcon =
+                typeof gtObjects?.iconMeasure === "string" ? gtObjects.iconMeasure.trim() : "";
+            this.formattingSettings.syncIconMeasureOptions(
+                earlyIcons,
+                persistedGtIcon || this.formattingSettings.getGrandTotalIconQueryName(),
+            );
+            if (persistedGtIcon) {
+                this.formattingSettings.ensureIconMeasureItem(
+                    this.formattingSettings.grandTotal.iconMeasure,
+                    persistedGtIcon,
+                );
+            }
+
             const style = this.formattingSettings.toResolvedStyle();
             // Garante imagens do cache de sessão no estilo (mesmo se o JSON ainda não voltou do host).
             for (const [cat, url] of Object.entries(this.categoryImageCache)) {
@@ -107,7 +129,10 @@ export class Visual implements IVisual {
                 }
             }
             this.lastView = view;
-            this.formattingSettings.syncIconMeasureOptions(view.iconMeasureOptions);
+            this.formattingSettings.syncIconMeasureOptions(
+                view.iconMeasureOptions,
+                persistedGtIcon || this.formattingSettings.getGrandTotalIconQueryName(),
+            );
             this.formattingSettings.syncCategoryEditorFromMap(
                 view.categoryNames,
                 this.stickySelectedCategory,
@@ -129,7 +154,10 @@ export class Visual implements IVisual {
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
         if (this.lastView) {
-            this.formattingSettings.syncIconMeasureOptions(this.lastView.iconMeasureOptions);
+            this.formattingSettings.syncIconMeasureOptions(
+                this.lastView.iconMeasureOptions,
+                this.formattingSettings.getGrandTotalIconQueryName(),
+            );
             this.formattingSettings.syncCategoryEditorFromMap(
                 this.lastView.categoryNames,
                 this.stickySelectedCategory,
@@ -143,7 +171,14 @@ export class Visual implements IVisual {
         if (this.lastView?.columns.length) {
             const card = buildKpiContainerCard(this.lastView.columns, this.lastView.complementOptions);
             if (card) {
-                model.cards.push(card);
+                const anchor = model.cards.findIndex(
+                    (item) => "uid" in item && item.uid === "values-card",
+                );
+                if (anchor >= 0) {
+                    model.cards.splice(anchor + 1, 0, card);
+                } else {
+                    model.cards.push(card);
+                }
             }
         }
         return model;

@@ -79,8 +79,8 @@
     z-index: 2;
     width: var(--cat-width, 180px);
     padding: 8px 10px;
-    border-right-width: max(2px, var(--col-border-width, 1px));
-    border-right-color: var(--col-border-color, #e1e5ea);
+    border-right-width: var(--cat-border-width, var(--col-border-width, 1px));
+    border-right-color: var(--cat-border-color, var(--col-border-color, #e1e5ea));
     border-bottom-left-radius: var(--row-radius, 0px);
     border-top-left-radius: var(--row-radius, 0px);
     display: flex;

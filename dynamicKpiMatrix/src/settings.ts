@@ -126,7 +126,7 @@ function asDisplayMode(value: unknown, fallback: DisplayMode = "text"): DisplayM
     return fallback;
 }
 
-class GeneralCard extends FormattingSettingsCard {
+class GeneralCard extends FormattingSettingsCompositeCard {
     fontFamily = new formattingSettings.FontPicker({
         name: "fontFamily",
         displayName: "Família da fonte",
@@ -136,6 +136,7 @@ class GeneralCard extends FormattingSettingsCard {
     fontColor = color("fontColor", "Cor padrão", defaultStyle.fontColor);
     fontWeight = dropdown("fontWeight", "Peso da fonte", defaultStyle.fontWeight, WEIGHTS);
     background = color("background", "Fundo do visual", defaultStyle.background);
+    /** Mantidos ocultos para hidratar relatórios já salvos. A borda do contêiner não é desenhada. */
     borderColor = color("borderColor", "Cor da borda", defaultStyle.borderColor);
     borderWidth = num("borderWidth", "Espessura da borda", defaultStyle.borderWidth);
     borderRadius = num("borderRadius", "Arredondamento", defaultStyle.borderRadius);
@@ -143,46 +144,84 @@ class GeneralCard extends FormattingSettingsCard {
     rowGap = num("rowGap", "Espaçamento vertical", defaultStyle.rowGap);
 
     name = "general";
-    displayName = "Aparência Geral";
-    slices: FormattingSettingsSlice[] = [
-        this.fontFamily,
-        this.fontSize,
-        this.fontColor,
-        this.fontWeight,
-        this.background,
-        this.borderColor,
-        this.borderWidth,
-        this.borderRadius,
-        this.rowHeight,
-        this.rowGap,
+    displayName = "Aparência do visual";
+    groups: FormattingSettingsGroup[] = [
+        new FormattingSettingsGroup({
+            name: "generalTypography",
+            displayName: "Tipografia",
+            collapsible: true,
+            slices: [this.fontFamily, this.fontSize, this.fontColor, this.fontWeight],
+        }),
+        new FormattingSettingsGroup({
+            name: "generalContainer",
+            displayName: "Contêiner",
+            collapsible: true,
+            slices: [
+                this.background,
+                this.borderColor,
+                this.borderWidth,
+                this.borderRadius,
+                this.rowHeight,
+                this.rowGap,
+            ],
+        }),
     ];
+
+    public onPreProcess(): void {
+        this.borderColor.visible = false;
+        this.borderWidth.visible = false;
+        this.borderRadius.visible = false;
+        this.rowHeight.visible = false;
+        this.rowGap.visible = false;
+    }
 }
 
-class CategoriesGeralGroup extends FormattingSettingsGroup {
+class CategoriesColumnGroup extends FormattingSettingsGroup {
     width = num("width", "Largura da coluna", defaultStyle.categoryWidth);
+    showRightBorder = toggle(
+        "showRightBorder",
+        "Borda direita",
+        defaultStyle.categoryShowRightBorder,
+    );
+    sortMode = dropdown("sortMode", "Ordenação", defaultStyle.sortMode, SORT_MODES);
+
+    name = "categoriesColumn";
+    displayName = "Coluna";
+    collapsible = true;
+    slices: FormattingSettingsSlice[] = [this.width, this.showRightBorder, this.sortMode];
+
+    constructor() {
+        super({ name: "categoriesColumn", displayName: "Coluna", slices: [] });
+    }
+}
+
+class CategoriesTextGroup extends FormattingSettingsGroup {
     fontSize = num("fontSize", "Tamanho da fonte", defaultStyle.categoryFontSize);
     fontColor = color("fontColor", "Cor da fonte", defaultStyle.categoryFontColor);
     fontWeight = dropdown("fontWeight", "Peso da fonte", defaultStyle.categoryFontWeight, WEIGHTS);
     alignment = dropdown("alignment", "Alinhamento", defaultStyle.categoryAlignment, ALIGNS);
-    imageSize = num("imageSize", "Tamanho da imagem", defaultStyle.imageSize);
-    imagePlacement = dropdown("imagePlacement", "Posição da imagem", defaultStyle.imagePlacement, IMAGE_PLACES);
-    sortMode = dropdown("sortMode", "Ordenação", defaultStyle.sortMode, SORT_MODES);
 
-    name = "categoriesGeral";
-    displayName = "Geral";
-    slices: FormattingSettingsSlice[] = [
-        this.width,
-        this.fontSize,
-        this.fontColor,
-        this.fontWeight,
-        this.alignment,
-        this.imageSize,
-        this.imagePlacement,
-        this.sortMode,
-    ];
+    name = "categoriesText";
+    displayName = "Texto";
+    collapsible = true;
+    slices: FormattingSettingsSlice[] = [this.fontSize, this.fontColor, this.fontWeight, this.alignment];
 
     constructor() {
-        super({ name: "categoriesGeral", slices: [] });
+        super({ name: "categoriesText", displayName: "Texto", slices: [] });
+    }
+}
+
+class CategoriesIconGroup extends FormattingSettingsGroup {
+    imageSize = num("imageSize", "Tamanho da imagem", defaultStyle.imageSize);
+    imagePlacement = dropdown("imagePlacement", "Posição da imagem", defaultStyle.imagePlacement, IMAGE_PLACES);
+
+    name = "categoriesIcon";
+    displayName = "Ícone";
+    collapsible = true;
+    slices: FormattingSettingsSlice[] = [this.imageSize, this.imagePlacement];
+
+    constructor() {
+        super({ name: "categoriesIcon", displayName: "Ícone", slices: [] });
     }
 }
 
@@ -215,8 +254,9 @@ class CategoriesImagensGroup extends FormattingSettingsGroup {
         placeholder: "{}",
     });
 
-    name = "categoriesImagens";
-    displayName = "Imagens";
+    name = "categoriesContent";
+    displayName = "Por categoria";
+    collapsible = true;
     slices: FormattingSettingsSlice[] = [
         this.selectedCategory,
         this.categoryDisplayMode,
@@ -227,7 +267,7 @@ class CategoriesImagensGroup extends FormattingSettingsGroup {
     ];
 
     constructor() {
-        super({ name: "categoriesImagens", slices: [] });
+        super({ name: "categoriesContent", displayName: "Por categoria", slices: [] });
     }
 
     public applyVisibility(): void {
@@ -243,19 +283,21 @@ class CategoriesImagensGroup extends FormattingSettingsGroup {
 }
 
 class CategoriesCard extends FormattingSettingsCompositeCard {
-    geral = new CategoriesGeralGroup();
+    coluna = new CategoriesColumnGroup();
+    texto = new CategoriesTextGroup();
+    icone = new CategoriesIconGroup();
     imagens = new CategoriesImagensGroup();
 
     name = "categories";
     displayName = "Categorias";
-    groups = [this.geral, this.imagens];
+    groups = [this.coluna, this.texto, this.icone, this.imagens];
 
     public onPreProcess(): void {
         this.imagens.applyVisibility();
     }
 }
 
-class GrandTotalCard extends FormattingSettingsCard {
+class GrandTotalCard extends FormattingSettingsCompositeCard {
     show = toggle("show", "Exibir Total Geral", defaultStyle.grandTotalShow);
     displayMode = dropdown("displayMode", "Exibição", "both", DISPLAY_MODES);
     label = text("label", "Texto", defaultStyle.grandTotalLabel, "Total Geral");
@@ -291,16 +333,39 @@ class GrandTotalCard extends FormattingSettingsCard {
     name = "grandTotal";
     displayName = "Total Geral";
     topLevelSlice = this.show;
-    slices: FormattingSettingsSlice[] = [
-        this.displayMode,
-        this.label,
-        this.iconMeasure,
-        this.fontSize,
-        this.fontColor,
-        this.background,
-        this.rowHeight,
-        this.alignment,
-        this.imageSize,
+    groups: FormattingSettingsGroup[] = [
+        new FormattingSettingsGroup({
+            name: "grandTotalContent",
+            displayName: "Conteúdo",
+            collapsible: true,
+            slices: [
+                this.displayMode,
+                this.label,
+                this.iconMeasure,
+                this.imageType,
+                this.imageData,
+                this.imageUrl,
+                this.svgMarkup,
+            ],
+        }),
+        new FormattingSettingsGroup({
+            name: "grandTotalText",
+            displayName: "Texto",
+            collapsible: true,
+            slices: [this.fontSize, this.fontColor, this.alignment],
+        }),
+        new FormattingSettingsGroup({
+            name: "grandTotalCell",
+            displayName: "Célula",
+            collapsible: true,
+            slices: [this.background, this.rowHeight],
+        }),
+        new FormattingSettingsGroup({
+            name: "grandTotalIcon",
+            displayName: "Ícone",
+            collapsible: true,
+            slices: [this.imageSize],
+        }),
     ];
 
     public onPreProcess(): void {
@@ -314,7 +379,7 @@ class GrandTotalCard extends FormattingSettingsCard {
     }
 }
 
-class RowsCard extends FormattingSettingsCard {
+class RowsCard extends FormattingSettingsCompositeCard {
     zebra = toggle("zebra", "Zebrar linhas", defaultStyle.zebra);
     defaultBackground = color("defaultBackground", "Cor de fundo", defaultStyle.rowDefaultBackground);
     evenBackground = color("evenBackground", "Cor (linhas pares)", defaultStyle.rowEvenBackground);
@@ -327,21 +392,35 @@ class RowsCard extends FormattingSettingsCard {
 
     name = "rows";
     displayName = "Linhas";
-    description = "Zebra, cores, borda, espessura e arredondamento das linhas.";
-    slices: FormattingSettingsSlice[] = [
-        this.zebra,
-        this.defaultBackground,
-        this.evenBackground,
-        this.oddBackground,
-        this.borderColor,
-        this.borderWidth,
-        this.borderRadius,
-        this.rowHeight,
-        this.rowGap,
+    groups: FormattingSettingsGroup[] = [
+        new FormattingSettingsGroup({
+            name: "rowsBackground",
+            displayName: "Fundo",
+            collapsible: true,
+            slices: [this.zebra, this.defaultBackground, this.evenBackground, this.oddBackground],
+        }),
+        new FormattingSettingsGroup({
+            name: "rowsBorder",
+            displayName: "Borda",
+            collapsible: true,
+            slices: [this.borderColor, this.borderWidth, this.borderRadius],
+        }),
+        new FormattingSettingsGroup({
+            name: "rowsSize",
+            displayName: "Tamanho",
+            collapsible: true,
+            slices: [this.rowHeight, this.rowGap],
+        }),
     ];
+
+    public onPreProcess(): void {
+        const on = this.zebra.value;
+        this.evenBackground.visible = on;
+        this.oddBackground.visible = on;
+    }
 }
 
-class ColumnsCard extends FormattingSettingsCard {
+class ColumnsCard extends FormattingSettingsCompositeCard {
     background = color("background", "Cor de fundo", defaultStyle.columnBackground);
     showBorder = toggle("showBorder", "Borda", defaultStyle.columnShowBorder);
     borderColor = color("borderColor", "Cor da borda", defaultStyle.columnBorderColor);
@@ -352,16 +431,26 @@ class ColumnsCard extends FormattingSettingsCard {
 
     name = "columns";
     displayName = "Colunas";
-    description =
-        "Largura respeita o maior texto (mesmo com 0). Borda pode ser ligada/desligada.";
-    slices: FormattingSettingsSlice[] = [
-        this.background,
-        this.showBorder,
-        this.borderColor,
-        this.borderWidth,
-        this.borderRadius,
-        this.columnWidth,
-        this.columnGap,
+    groups: FormattingSettingsGroup[] = [
+        new FormattingSettingsGroup({
+            name: "columnsMeasures",
+            displayName: "Medidas",
+            description: "A largura acompanha o maior texto quando o valor é 0.",
+            collapsible: true,
+            slices: [this.columnWidth, this.columnGap],
+        }),
+        new FormattingSettingsGroup({
+            name: "columnsBackground",
+            displayName: "Fundo",
+            collapsible: true,
+            slices: [this.background],
+        }),
+        new FormattingSettingsGroup({
+            name: "columnsBorder",
+            displayName: "Borda",
+            collapsible: true,
+            slices: [this.showBorder, this.borderColor, this.borderWidth, this.borderRadius],
+        }),
     ];
 
     public onPreProcess(): void {
@@ -371,7 +460,7 @@ class ColumnsCard extends FormattingSettingsCard {
     }
 }
 
-class ValuesCard extends FormattingSettingsCard {
+class ValuesCard extends FormattingSettingsCompositeCard {
     fontSize = num("fontSize", "Tamanho do texto", defaultStyle.valueFontSize);
     fontColor = color("fontColor", "Cor do texto", defaultStyle.valueFontColor);
     alignment = dropdown("alignment", "Alinhamento", defaultStyle.valueAlignment, ALIGNS);
@@ -396,29 +485,47 @@ class ValuesCard extends FormattingSettingsCard {
         "Altura personalizada (px)",
         defaultStyle.valueVerticalBorderCustomHeight,
     );
+    borderPadding = num(
+        "borderPadding",
+        "Espaçamento da borda",
+        defaultStyle.valueBorderPadding,
+    );
     borderColor = color("borderColor", "Cor da borda", defaultStyle.valueBorderColor);
     borderWidth = num("borderWidth", "Espessura da borda", defaultStyle.valueBorderWidth);
     borderRadius = num("borderRadius", "Arredondamento da borda", defaultStyle.valueBorderRadius);
 
     name = "values";
     displayName = "Valores";
-    description =
-        "Formatação do bloco valor + complementos: texto, unidades e bordas por lado.";
-    slices: FormattingSettingsSlice[] = [
-        this.fontSize,
-        this.fontColor,
-        this.alignment,
-        this.displayUnits,
-        this.precision,
-        this.borderLeft,
-        this.borderRight,
-        this.borderTop,
-        this.borderBottom,
-        this.verticalBorderHeight,
-        this.verticalBorderCustomHeight,
-        this.borderColor,
-        this.borderWidth,
-        this.borderRadius,
+    groups: FormattingSettingsGroup[] = [
+        new FormattingSettingsGroup({
+            name: "valuesText",
+            displayName: "Texto",
+            collapsible: true,
+            slices: [this.fontSize, this.fontColor, this.alignment],
+        }),
+        new FormattingSettingsGroup({
+            name: "valuesNumber",
+            displayName: "Número",
+            collapsible: true,
+            slices: [this.displayUnits, this.precision],
+        }),
+        new FormattingSettingsGroup({
+            name: "valuesBorder",
+            displayName: "Borda",
+            collapsible: true,
+            slices: [
+                this.borderLeft,
+                this.borderRight,
+                this.borderTop,
+                this.borderBottom,
+                this.verticalBorderHeight,
+                this.verticalBorderCustomHeight,
+                this.borderPadding,
+                this.borderColor,
+                this.borderWidth,
+                this.borderRadius,
+            ],
+        }),
     ];
 
     public onPreProcess(): void {
@@ -431,13 +538,14 @@ class ValuesCard extends FormattingSettingsCard {
         const vMode = String(this.verticalBorderHeight.value?.value ?? "full");
         this.verticalBorderHeight.visible = anyVertical;
         this.verticalBorderCustomHeight.visible = anyVertical && vMode === "custom";
+        this.borderPadding.visible = anyBorder;
         this.borderColor.visible = anyBorder;
         this.borderWidth.visible = anyBorder;
         this.borderRadius.visible = anyBorder;
     }
 }
 
-class HeaderCard extends FormattingSettingsCard {
+class HeaderCard extends FormattingSettingsCompositeCard {
     fontSize = num("fontSize", "Tamanho", defaultStyle.headerFontSize);
     fontColor = color("fontColor", "Cor", defaultStyle.headerFontColor);
     background = color("background", "Fundo", defaultStyle.headerBackground);
@@ -445,7 +553,20 @@ class HeaderCard extends FormattingSettingsCard {
 
     name = "header";
     displayName = "Cabeçalho";
-    slices: FormattingSettingsSlice[] = [this.fontSize, this.fontColor, this.background, this.fontWeight];
+    groups: FormattingSettingsGroup[] = [
+        new FormattingSettingsGroup({
+            name: "headerText",
+            displayName: "Texto",
+            collapsible: true,
+            slices: [this.fontSize, this.fontColor, this.fontWeight],
+        }),
+        new FormattingSettingsGroup({
+            name: "headerBackground",
+            displayName: "Fundo",
+            collapsible: true,
+            slices: [this.background],
+        }),
+    ];
 }
 
 class SubTotalsCard extends FormattingSettingsCard {
@@ -482,12 +603,12 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
 
     cards = [
         this.general,
+        this.header,
         this.categories,
         this.values,
-        this.grandTotal,
-        this.header,
         this.rows,
         this.columns,
+        this.grandTotal,
         this.subTotals,
         this.tooltip,
     ];
@@ -495,11 +616,6 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     /** Acesso curto ao grupo Imagens. */
     get categoryImages(): CategoriesImagensGroup {
         return this.categories.imagens;
-    }
-
-    /** Acesso curto ao grupo Geral. */
-    get categoriesGeral(): CategoriesGeralGroup {
-        return this.categories.geral;
     }
 
     /**
@@ -613,13 +729,18 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         this.categoryImages.selectedCategory.value = match;
     }
 
-    private ensureIconMeasureItem(
+    public ensureIconMeasureItem(
         dropdownCtrl: formattingSettings.ItemDropdown,
         queryName: string,
         displayName?: string,
     ): void {
+        if (!queryName) {
+            return;
+        }
         const items = dropdownCtrl.items ?? [NONE_ICON];
-        let match = items.find((i) => String(i.value) === queryName);
+        let match =
+            items.find((i) => String(i.value) === queryName) ||
+            items.find((i) => String(i.displayName) === queryName);
         if (!match) {
             match = { value: queryName, displayName: displayName || queryName };
             dropdownCtrl.items = [...items.filter((i) => String(i.value) !== ""), match];
@@ -630,8 +751,22 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         dropdownCtrl.value = match;
     }
 
+    /** Lê valor de ItemDropdown mesmo se o populate deixou string crua. */
+    private readDropdownValue(control: formattingSettings.ItemDropdown): string {
+        const raw = control.value as unknown;
+        if (typeof raw === "string") {
+            return raw.trim();
+        }
+        if (raw && typeof raw === "object" && "value" in (raw as object)) {
+            return String((raw as { value?: string }).value ?? "").trim();
+        }
+        return "";
+    }
+
     public syncIconMeasureOptions(
         options: Array<{ queryName: string; displayName: string }>,
+        preferredGrandTotal?: string,
+        preferredCategory?: string,
     ): void {
         const items = [
             NONE_ICON,
@@ -640,13 +775,19 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         this.categoryImages.categoryIconMeasure.items = items;
         this.grandTotal.iconMeasure.items = items;
 
-        const catSelected = String(this.categoryImages.categoryIconMeasure.value?.value ?? "").trim();
+        const catSelected =
+            (preferredCategory || "").trim() || this.readDropdownValue(this.categoryImages.categoryIconMeasure);
         this.categoryImages.categoryIconMeasure.value =
-            items.find((i) => String(i.value) === catSelected) ?? NONE_ICON;
+            items.find((i) => String(i.value) === catSelected) ??
+            items.find((i) => String(i.displayName) === catSelected) ??
+            NONE_ICON;
 
-        const gtSelected = String(this.grandTotal.iconMeasure.value?.value ?? "").trim();
+        const gtSelected =
+            (preferredGrandTotal || "").trim() || this.readDropdownValue(this.grandTotal.iconMeasure);
         this.grandTotal.iconMeasure.value =
-            items.find((i) => String(i.value) === gtSelected) ?? NONE_ICON;
+            items.find((i) => String(i.value) === gtSelected) ??
+            items.find((i) => String(i.displayName) === gtSelected) ??
+            NONE_ICON;
     }
 
     public getSelectedCategoryName(): string {
@@ -658,11 +799,11 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     }
 
     public getCategoryEditorIconQueryName(): string {
-        return String(this.categoryImages.categoryIconMeasure.value?.value ?? "").trim();
+        return this.readDropdownValue(this.categoryImages.categoryIconMeasure);
     }
 
     public getGrandTotalIconQueryName(): string {
-        return String(this.grandTotal.iconMeasure.value?.value ?? "").trim();
+        return this.readDropdownValue(this.grandTotal.iconMeasure);
     }
 
     public getCategoryImageType(): ImageSourceType {
@@ -841,7 +982,9 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
 
         const grandImage = this.getGrandTotalImagePayload();
         const label = (this.grandTotal.label.value || "").trim() || defaultStyle.grandTotalLabel;
-        const geral = this.categoriesGeral;
+        const coluna = this.categories.coluna;
+        const texto = this.categories.texto;
+        const icone = this.categories.icone;
 
         return {
             fontFamily: this.general.fontFamily.value || defaultStyle.fontFamily,
@@ -854,15 +997,16 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             borderRadius: this.general.borderRadius.value,
             rowHeight: this.rows.rowHeight.value || this.general.rowHeight.value,
             rowGap: this.rows.rowGap.value || this.general.rowGap.value,
-            categoryWidth: geral.width.value,
-            categoryFontSize: geral.fontSize.value,
-            categoryFontColor: geral.fontColor.value.value,
-            categoryFontWeight: String(geral.fontWeight.value.value),
-            categoryAlignment: String(geral.alignment.value.value) as Align,
-            imageSize: geral.imageSize.value,
-            imagePlacement: String(geral.imagePlacement.value.value) as ImagePlacement,
+            categoryWidth: coluna.width.value,
+            categoryFontSize: texto.fontSize.value,
+            categoryFontColor: texto.fontColor.value.value,
+            categoryFontWeight: String(texto.fontWeight.value.value),
+            categoryAlignment: String(texto.alignment.value.value) as Align,
+            imageSize: icone.imageSize.value,
+            imagePlacement: String(icone.imagePlacement.value.value) as ImagePlacement,
+            categoryShowRightBorder: coluna.showRightBorder.value,
             categoryImageType: this.getCategoryImageType(),
-            sortMode: String(geral.sortMode.value.value) as SortMode,
+            sortMode: String(coluna.sortMode.value.value) as SortMode,
             grandTotalShow: this.grandTotal.show.value,
             grandTotalLabel: label,
             grandTotalDisplayMode: asDisplayMode(this.grandTotal.displayMode.value, "both"),
@@ -905,6 +1049,7 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
                 1,
                 this.values.verticalBorderCustomHeight.value || 24,
             ),
+            valueBorderPadding: Math.max(0, this.values.borderPadding.value ?? 2),
             valueBorderColor: this.values.borderColor.value.value,
             valueBorderWidth: this.values.borderWidth.value,
             valueBorderRadius: this.values.borderRadius.value,
