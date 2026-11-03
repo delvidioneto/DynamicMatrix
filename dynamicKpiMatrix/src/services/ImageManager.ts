@@ -38,29 +38,31 @@ export function resolveImageSource(raw: string | undefined): ResolvedImage {
         return { kind: "none" };
     }
 
+    // SVG inline (com ou sem wrapper de aspas já removido).
     if (value.toLowerCase().includes("<svg")) {
         const html = sanitizeSvg(value);
         return html ? { kind: "svg", html } : { kind: "none" };
     }
 
     if (isDataImageUri(value)) {
-        if (value.toLowerCase().startsWith("data:image/svg+xml")) {
+        if (value.toLowerCase().includes("image/svg+xml")) {
             try {
                 const comma = value.indexOf(",");
                 const payload = value.slice(comma + 1);
-                const decoded = value.includes(";base64,")
+                const decoded = value.toLowerCase().includes(";base64,")
                     ? atob(payload)
                     : decodeURIComponent(payload);
                 const html = sanitizeSvg(decoded);
                 return html ? { kind: "svg", html } : { kind: "none" };
             } catch {
-                return { kind: "none" };
+                // Se falhar o decode, ainda tenta como <img src="data:...">.
+                return { kind: "img", src: value };
             }
         }
         return { kind: "img", src: value };
     }
 
-    if (isHttpImageUrl(value) || value.startsWith("/")) {
+    if (isHttpImageUrl(value) || value.startsWith("/") || value.startsWith("blob:")) {
         return { kind: "img", src: value };
     }
 

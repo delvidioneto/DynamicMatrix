@@ -3,7 +3,7 @@
 import powerbi from "powerbi-visuals-api";
 import { formatMeasureValue, ValueFormatOptions } from "./formatValue";
 import { buildKpiColumns, collectMeasures } from "./kpiMapper";
-import { CategoryMetaMap, parseCategoryMetaMap } from "./categoryMeta";
+import { CategoryMetaMap, findCategoryMeta, parseCategoryMetaMap } from "./categoryMeta";
 import {
     ComplementValue,
     KpiCellData,
@@ -171,7 +171,7 @@ function toRow(
 ): MatrixRow {
     const isTotal = isSubtotalNode(node);
     const category = isTotal ? totalLabel : nodeValue(node);
-    const meta = metaMap[category];
+    const meta = isTotal ? undefined : findCategoryMeta(metaMap, category);
     const iconMeasure = measures.find((m) => m.role === "categoryIcon");
     const iconRaw = iconMeasure
         ? unwrapMeasureText(String(readMatrixValue(node, iconMeasure.valueSourceIndex) ?? ""))

@@ -3,7 +3,7 @@
 import { convertDataView } from "./dataConverter";
 import { DisplayUnits, formatMeasureValue, normalizeCfRatio } from "./formatValue";
 import { buildKpiColumns, collectMeasures, parseMappingJson, syncMappingJson } from "./kpiMapper";
-import { parseCategoryMetaMap, upsertCategoryMeta } from "./categoryMeta";
+import { findCategoryMeta, parseCategoryMetaMap, upsertCategoryMeta } from "./categoryMeta";
 import { applyConditionalColors } from "../services/ConditionalFormatting";
 import { sanitizeSvg, isDataImageUri } from "../services/SvgSanitizer";
 import { resolveImageSource, validatePersistedImage } from "../services/ImageManager";
@@ -361,6 +361,10 @@ function assert(condition: unknown, message: string): asserts condition {
 {
     let map = parseCategoryMetaMap('{"A":{"title":"Alpha","imageUrl":"data:image/png;base64,xx"}}');
     assert(map.A.title === "Alpha", "title parsed");
+    const found = findCategoryMeta(map, " a ");
+    assert(found?.title === "Alpha", "case/trim meta lookup");
+    map = upsertCategoryMeta(map, "A", { title: "Alpha", imageUrl: "" });
+    assert(Boolean(map.A.imageUrl), "empty imageUrl does not wipe without clearImage");
     map = upsertCategoryMeta(map, "A", { title: "" });
     assert(!map.A?.title, "title cleared");
 }

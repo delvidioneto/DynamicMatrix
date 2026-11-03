@@ -58,16 +58,33 @@ export function serializeCategoryMetaMap(map: CategoryMetaMap): string {
     return JSON.stringify(map ?? {});
 }
 
+/** Busca meta com match exato ou trim/case-insensitive. */
+export function findCategoryMeta(map: CategoryMetaMap, category: string): CategoryMeta | undefined {
+    if (!category) {
+        return undefined;
+    }
+    if (map[category]) {
+        return map[category];
+    }
+    const needle = category.trim().toLowerCase();
+    const key = Object.keys(map).find((k) => k.trim().toLowerCase() === needle);
+    return key ? map[key] : undefined;
+}
+
 export function upsertCategoryMeta(
     map: CategoryMetaMap,
     category: string,
     patch: CategoryMeta,
+    options?: { clearImage?: boolean },
 ): CategoryMetaMap {
     if (!category) {
         return { ...map };
     }
     const next = { ...map };
-    const current = { ...(next[category] ?? {}) };
+    const existingKey =
+        Object.keys(next).find((k) => k.trim().toLowerCase() === category.trim().toLowerCase()) ||
+        category;
+    const current = { ...(next[existingKey] ?? {}) };
     if (patch.title !== undefined) {
         const title = patch.title.trim();
         if (title) {
@@ -80,21 +97,22 @@ export function upsertCategoryMeta(
         const imageUrl = patch.imageUrl.trim();
         if (imageUrl) {
             current.imageUrl = imageUrl;
-        } else {
+        } else if (options?.clearImage) {
             delete current.imageUrl;
             delete current.imageName;
         }
+        // Se imageUrl veio vazio sem clearImage, preserva a imagem já salva.
     }
-    if (patch.imageName !== undefined) {
-        if (patch.imageName.trim()) {
-            current.imageName = patch.imageName.trim();
-        } else {
-            delete current.imageName;
-        }
+    if (patch.imageName !== undefined && patch.imageName.trim()) {
+        current.imageName = patch.imageName.trim();
     }
     if (!current.title && !current.imageUrl) {
-        delete next[category];
+        delete next[existingKey];
     } else {
+        // Normaliza chave para o nome atual da categoria.
+        if (existingKey !== category && next[existingKey]) {
+            delete next[existingKey];
+        }
         next[category] = current;
     }
     return next;

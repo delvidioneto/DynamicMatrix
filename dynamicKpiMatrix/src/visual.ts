@@ -43,6 +43,9 @@ export class Visual implements IVisual {
     private editorCategoryKey = "";
     /** Seleção persistida — sobrevive ao populate que limpa o ItemDropdown. */
     private stickySelectedCategory = "";
+    /** Cache de imagens por categoria (sobrevive a update que limpa ImageUpload). */
+    private categoryImageCache: Record<string, string> = {};
+    private grandTotalImageCache = "";
 
     constructor(options: VisualConstructorOptions) {
         this.events = options.host.eventService;
@@ -82,11 +85,27 @@ export class Visual implements IVisual {
             }
 
             this.selectionIds = this.buildSelectionIds(dataView);
+            this.refreshImageCaches();
             this.syncCategoryEditorState();
             this.persistImageProperties();
 
             const style = this.formattingSettings.toResolvedStyle();
+            // Garante imagens do cache de sessão no estilo (mesmo se o JSON ainda não voltou do host).
+            for (const [cat, url] of Object.entries(this.categoryImageCache)) {
+                if (url && !style.categoryImages[cat]) {
+                    style.categoryImages[cat] = url;
+                }
+            }
+            if (!style.grandTotalImageData && this.grandTotalImageCache) {
+                style.grandTotalImageData = this.grandTotalImageCache;
+            }
             const view = convertDataView(dataView, this.formattingSettings.convertOptions());
+            // Reaplica cache nas linhas caso o mapa persistido ainda esteja vazio neste ciclo.
+            for (const row of view.rows) {
+                if (!row.iconPersisted && this.categoryImageCache[row.category]) {
+                    row.iconPersisted = this.categoryImageCache[row.category];
+                }
+            }
             this.lastView = view;
             this.formattingSettings.syncCategoryEditorFromMap(
                 view.categoryNames,
@@ -157,24 +176,53 @@ export class Visual implements IVisual {
             const synced = this.formattingSettings.buildSyncedCategoriesJson();
             const current =
                 this.formattingSettings.categoryImages.categoriesJson.value?.trim() || "{}";
+            const payload = this.formattingSettings.getEditorImagePayload();
+            if (payload.imageUrl) {
+                this.categoryImageCache[selected] = payload.imageUrl;
+                this.formattingSettings.categoryImages.imageUrl.value = payload.imageUrl;
+            }
             if (synced !== current && synced !== this.lastPersistedCategoriesJson) {
                 this.lastPersistedCategoriesJson = synced;
                 this.formattingSettings.categoryImages.categoriesJson.value = synced;
+                const props: Record<string, unknown> = {
+                    categoriesJson: synced,
+                    selectedCategory: selected,
+                    imageType: this.formattingSettings.getCategoryImageType(),
+                };
+                if (payload.imageUrl) {
+                    props.imageUrl = payload.imageUrl;
+                }
                 this.visualHost.persistProperties({
                     merge: [
                         {
                             objectName: "categoryImages",
                             selector: null as unknown as powerbi.data.Selector,
-                            properties: {
-                                categoriesJson: synced,
-                                selectedCategory: selected,
-                            },
+                            properties: props,
                         },
                     ],
                 });
             }
         }
         this.editorCategoryKey = selected;
+    }
+
+    private refreshImageCaches(): void {
+        const selected = this.formattingSettings.getSelectedCategoryName();
+        const payload = this.formattingSettings.getEditorImagePayload();
+        if (selected && payload.imageUrl) {
+            this.categoryImageCache[selected] = payload.imageUrl;
+        }
+        // Também reidrata cache a partir do mapa JSON já persistido.
+        const map = this.formattingSettings.getCategoryMetaMap();
+        for (const [cat, meta] of Object.entries(map)) {
+            if (meta.imageUrl) {
+                this.categoryImageCache[cat] = meta.imageUrl;
+            }
+        }
+        const gt = this.formattingSettings.getGrandTotalImagePayload();
+        if (gt) {
+            this.grandTotalImageCache = gt;
+        }
     }
 
     private persistImageProperties(): void {

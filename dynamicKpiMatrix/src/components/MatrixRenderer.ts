@@ -53,18 +53,58 @@ export function parseCellTooltip(raw: string | undefined): TooltipPayloadItem[] 
     }
 }
 
-function columnWidthCss(col: KpiColumnConfig, style: ResolvedVisualStyle): string {
-    // Largura pedida pelo usuário (pode ser 0), mas nunca menor que o maior texto.
-    const preferred = Math.max(
-        0,
-        col.widthMode === "fixed" ? col.columnWidth : style.columnWidth || col.columnWidth || 0,
-    );
-    return `max(${preferred}px, max-content)`;
+/** Estimativa de largura de texto para manter cabeçalho e corpo alinhados (px fixos). */
+function estimateTextWidth(text: string | undefined, fontSize: number, padding = 20): number {
+    const len = (text ?? "").length;
+    if (!len) {
+        return padding;
+    }
+    return Math.ceil(len * Math.max(fontSize, 10) * 0.62) + padding;
 }
 
-function categoryWidthCss(style: ResolvedVisualStyle): string {
-    const preferred = Math.max(0, style.categoryWidth || 0);
-    return `max(${preferred}px, max-content)`;
+/**
+ * Larguras em px compartilhadas entre freeze e body.
+ * Nunca menores que o maior texto da coluna (mesmo com largura configurada = 0).
+ */
+function resolveGridTemplateColumns(view: VisualViewModel, style: ResolvedVisualStyle): string {
+    const rows = [...view.rows, ...(view.totalRow ? [view.totalRow] : [])];
+
+    let catW = Math.max(0, style.categoryWidth || 0);
+    catW = Math.max(catW, estimateTextWidth("Categoria", style.headerFontSize));
+    for (const row of rows) {
+        catW = Math.max(
+            catW,
+            estimateTextWidth(row.displayTitle || row.category, style.categoryFontSize, 28),
+        );
+    }
+    catW = Math.max(catW, 48);
+
+    const colWs = view.columns.map((col, colIndex) => {
+        const preferred = Math.max(
+            0,
+            col.widthMode === "fixed" ? col.columnWidth : style.columnWidth || col.columnWidth || 0,
+        );
+        const primarySize = col.primaryFontSize ?? style.valueFontSize ?? style.fontSize;
+        const compSize = col.complementFontSize ?? Math.max(primarySize - 3, 10);
+        const labelSize = col.labelFontSize ?? Math.max(style.fontSize - 2, 9);
+
+        let w = preferred;
+        w = Math.max(w, estimateTextWidth(col.title || col.displayName, style.headerFontSize));
+        for (const row of rows) {
+            const cell = row.cells[colIndex];
+            if (!cell) {
+                continue;
+            }
+            w = Math.max(w, estimateTextWidth(cell.primary.text, primarySize, 24));
+            for (const comp of cell.complements) {
+                w = Math.max(w, estimateTextWidth(comp.label, labelSize, 16));
+                w = Math.max(w, estimateTextWidth(comp.value.text, compSize, 16));
+            }
+        }
+        return Math.max(w, 48);
+    });
+
+    return [`${catW}px`, ...colWs.map((w) => `${w}px`)].join(" ");
 }
 
 function resolveLayout(cell: KpiCellData, col: KpiColumnConfig): CellLayout {
@@ -114,6 +154,18 @@ function isRasterSource(raw: string | undefined): boolean {
     return Boolean(v && (isDataImageUri(v) || isHttpImageUrl(v)) && !v.toLowerCase().includes("<svg"));
 }
 
+function styleCategoryImage(style: ResolvedVisualStyle, category: string): string {
+    const direct = style.categoryImages?.[category];
+    if (direct) {
+        return unwrapMeasureText(direct);
+    }
+    const needle = category.trim().toLowerCase();
+    const key = Object.keys(style.categoryImages || {}).find(
+        (k) => k.trim().toLowerCase() === needle,
+    );
+    return key ? unwrapMeasureText(style.categoryImages[key]) : "";
+}
+
 function pickCategoryImageSource(
     row: MatrixRow,
     style: ResolvedVisualStyle,
@@ -121,11 +173,11 @@ function pickCategoryImageSource(
 ): string {
     const measure = unwrapMeasureText(row.iconRaw);
     const persisted = unwrapMeasureText(row.iconPersisted);
+    const fromStyleMap = styleCategoryImage(style, row.category);
     const configured = unwrapMeasureText(style.grandTotalImageData);
 
     if (isTotal) {
         if (style.grandTotalImageType === "svg") {
-            // Preferência: SVG configurado no painel → medida Ícone da categoria no total.
             if (configured.toLowerCase().includes("<svg")) {
                 return configured;
             }
@@ -134,7 +186,6 @@ function pickCategoryImageSource(
             }
             return configured || measure || persisted;
         }
-        // PNG: upload/persistido; medida só se for raster.
         if (configured) {
             return configured;
         }
@@ -148,15 +199,19 @@ function pickCategoryImageSource(
         if (measure.toLowerCase().includes("<svg")) {
             return measure;
         }
-        if (persisted.toLowerCase().includes("<svg")) {
-            return persisted;
+        const svgCandidate = persisted || fromStyleMap;
+        if (svgCandidate.toLowerCase().includes("<svg")) {
+            return svgCandidate;
         }
-        return measure || persisted;
+        return measure || svgCandidate;
     }
 
-    // PNG por categoria: upload persistido; medida raster como fallback.
+    // PNG: mapa persistido → estilo resolvido → medida raster.
     if (persisted) {
         return persisted;
+    }
+    if (fromStyleMap) {
+        return fromStyleMap;
     }
     if (isRasterSource(measure)) {
         return measure;
@@ -368,10 +423,9 @@ export function buildMatrixHtml(view: VisualViewModel, style: ResolvedVisualStyl
         return `<div class="dkm-empty">${esc(view.emptyMessage)}</div>`;
     }
 
-    const templateColumns = [
-        categoryWidthCss(style),
-        ...view.columns.map((col) => columnWidthCss(col, style)),
-    ].join(" ");
+    const templateColumns = resolveGridTemplateColumns(view, style);
+    const catTrack = templateColumns.split(" ")[0] || `${style.categoryWidth}px`;
+    const catWidthPx = Number.parseInt(catTrack, 10) || style.categoryWidth;
 
     const bodyRows = view.rows.map((row, i) => renderRow(row, view.columns, style, i)).join("");
     const total =
@@ -381,7 +435,7 @@ export function buildMatrixHtml(view: VisualViewModel, style: ResolvedVisualStyl
 
     // Cabeçalho + Total Geral ficam em bloco sticky no topo (sempre visíveis).
     return (
-        `<div class="dkm-root" style="font-family:${esc(style.fontFamily)},Segoe UI,Arial,sans-serif;background:${style.background};color:${style.fontColor};font-size:${style.fontSize}px;--cat-width:${style.categoryWidth}px;--grid-cols:${templateColumns};--header-bg:${style.headerBackground};--total-bg:${style.grandTotalBackground};--col-bg:${style.columnBackground};--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${style.columnBorderRadius}px;--col-gap:${style.columnGap}px;--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${style.rowBorderRadius}px">` +
+        `<div class="dkm-root" style="font-family:${esc(style.fontFamily)},Segoe UI,Arial,sans-serif;background:${style.background};color:${style.fontColor};font-size:${style.fontSize}px;--cat-width:${catWidthPx}px;--grid-cols:${templateColumns};--header-bg:${style.headerBackground};--total-bg:${style.grandTotalBackground};--col-bg:${style.columnBackground};--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${style.columnBorderRadius}px;--col-gap:${style.columnGap}px;--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${style.rowBorderRadius}px">` +
         `<div class="dkm-scroll">` +
         `<div class="dkm-freeze">` +
         `<div class="dkm-grid dkm-grid-freeze" style="grid-template-columns:${templateColumns};column-gap:${style.columnGap}px">` +

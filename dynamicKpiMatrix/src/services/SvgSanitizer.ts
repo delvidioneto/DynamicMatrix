@@ -21,7 +21,10 @@ export function sanitizeSvg(raw: string): string {
 }
 
 export function isDataImageUri(value: string): boolean {
-    return /^data:image\/(png|svg\+xml|jpeg|jpg|webp);base64,/i.test(value.trim());
+    // Aceita base64 e data URI sem base64 (ex.: svg+xml utf8).
+    return /^data:image\/(png|svg\+xml|jpeg|jpg|webp|gif)(;charset=[^;,]+)?(;base64)?,/i.test(
+        value.trim(),
+    );
 }
 
 export function isHttpImageUrl(value: string): boolean {

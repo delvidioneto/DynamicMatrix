@@ -115,9 +115,9 @@
                         ]
                     }
                 },
-                "imageData": { "type": { "text": true } },
-                "imageUrl": { "type": { "text": true } },
-                "svgMarkup": { "type": { "text": true } }
+                "imageData": { "displayName": "Upload PNG", "type": { "text": true } },
+                "imageUrl": { "displayName": "URL / data URI", "type": { "text": true } },
+                "svgMarkup": { "displayName": "SVG (texto)", "type": { "text": true } }
             }
         },
         "grandTotal": {
@@ -142,9 +142,9 @@
                         ]
                     }
                 },
-                "imageData": { "type": { "text": true } },
-                "imageUrl": { "type": { "text": true } },
-                "svgMarkup": { "type": { "text": true } },
+                "imageData": { "displayName": "Upload PNG", "type": { "text": true } },
+                "imageUrl": { "displayName": "URL / data URI", "type": { "text": true } },
+                "svgMarkup": { "displayName": "SVG (texto)", "type": { "text": true } },
                 "fontSize": { "type": { "numeric": true } },
                 "fontColor": { "type": { "fill": { "solid": { "color": true } } } },
                 "background": { "type": { "fill": { "solid": { "color": true } } } },

@@ -13,6 +13,7 @@ import {
 } from "./data/viewModel";
 import {
     CategoryMetaMap,
+    findCategoryMeta,
     imageValueFromMeta,
     metaFromImageValue,
     parseCategoryMetaMap,
@@ -183,7 +184,12 @@ class CategoryImagesCard extends FormattingSettingsCard {
         value: { ...EMPTY_IMAGE },
     });
     /** Persistência textual do PNG (o parser do ImageUpload descarta objetos sem .solid). */
-    imageUrl = text("imageUrl", "URL/data URI (avançado)", "", "data:image/png;base64,...");
+    imageUrl = text(
+        "imageUrl",
+        "URL ou data URI (PNG)",
+        "",
+        "Cole data:image/png;base64,... ou https://...",
+    );
     svgMarkup = new formattingSettings.TextArea({
         name: "svgMarkup",
         displayName: "SVG (texto)",
@@ -206,12 +212,13 @@ class CategoryImagesCard extends FormattingSettingsCard {
     name = "categoryImages";
     displayName = "Imagens das categorias";
     description =
-        "Selecione a categoria, escolha PNG (upload) ou SVG (medida/texto entre aspas). A imagem é redimensionada à coluna.";
+        "Selecione a categoria → PNG: use Upload e/ou cole a URL/data URI. SVG: cole o markup ou use a medida Ícone da categoria.";
     slices: FormattingSettingsSlice[] = [
         this.selectedCategory,
         this.categoryTitle,
         this.imageType,
         this.imageData,
+        this.imageUrl,
         this.svgMarkup,
         this.categoriesJson,
     ];
@@ -219,9 +226,10 @@ class CategoryImagesCard extends FormattingSettingsCard {
     public onPreProcess(): void {
         const isPng = asImageType(this.imageType.value?.value) === "png";
         this.imageData.visible = isPng;
+        this.imageUrl.visible = isPng;
         this.svgMarkup.visible = !isPng;
-        this.imageUrl.visible = false;
         this.imagesJson.visible = false;
+        this.categoriesJson.visible = false;
     }
 }
 
@@ -235,7 +243,12 @@ class GrandTotalCard extends FormattingSettingsCard {
         displayName: "Upload PNG",
         value: { ...EMPTY_IMAGE },
     });
-    imageUrl = text("imageUrl", "URL/data URI persistido", "", "data:image/png;base64,...");
+    imageUrl = text(
+        "imageUrl",
+        "URL ou data URI (PNG)",
+        "",
+        "Cole data:image/png;base64,... ou https://...",
+    );
     svgMarkup = new formattingSettings.TextArea({
         name: "svgMarkup",
         displayName: "SVG (texto)",
@@ -257,6 +270,7 @@ class GrandTotalCard extends FormattingSettingsCard {
         this.displayMode,
         this.imageType,
         this.imageData,
+        this.imageUrl,
         this.svgMarkup,
         this.fontSize,
         this.fontColor,
@@ -269,8 +283,8 @@ class GrandTotalCard extends FormattingSettingsCard {
     public onPreProcess(): void {
         const isPng = asImageType(this.imageType.value?.value) === "png";
         this.imageData.visible = isPng;
+        this.imageUrl.visible = isPng;
         this.svgMarkup.visible = !isPng;
-        this.imageUrl.visible = false;
     }
 }
 
@@ -465,18 +479,29 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             }
 
             const upload = coerceImageValue(catObj.imageData);
-            const urlText = unwrapMeasureText(String(catObj.imageUrl ?? ""));
-            const svgText = unwrapMeasureText(String(catObj.svgMarkup ?? ""));
-            if (upload.url) {
-                this.categoryImages.imageData.value = upload;
-                this.categoryImages.imageUrl.value = upload.url;
-            } else if (urlText) {
+            const urlText = unwrapMeasureText(
+                typeof catObj.imageUrl === "string" ? catObj.imageUrl : String(catObj.imageUrl ?? ""),
+            );
+            const svgText = unwrapMeasureText(
+                typeof catObj.svgMarkup === "string" ? catObj.svgMarkup : String(catObj.svgMarkup ?? ""),
+            );
+            const resolvedUrl = upload.url || urlText;
+            if (resolvedUrl) {
                 this.categoryImages.imageData.value = {
-                    name: "image",
-                    url: urlText,
-                    scaling: "normal",
+                    name: upload.name || "image",
+                    url: resolvedUrl,
+                    scaling: upload.scaling || "normal",
                 };
-                this.categoryImages.imageUrl.value = urlText;
+                this.categoryImages.imageUrl.value = resolvedUrl;
+            }
+            // Se o populate deixou imageData como string (text capability), normaliza.
+            const rawUpload = this.categoryImages.imageData.value as unknown;
+            if (typeof rawUpload === "string" && rawUpload.trim()) {
+                const coerced = coerceImageValue(rawUpload);
+                if (coerced.url) {
+                    this.categoryImages.imageData.value = coerced;
+                    this.categoryImages.imageUrl.value = coerced.url;
+                }
             }
             if (svgText) {
                 this.categoryImages.svgMarkup.value = svgText;
@@ -490,18 +515,28 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
                 this.grandTotal.imageType.value = IMAGE_TYPES.find((i) => i.value === t) ?? IMAGE_TYPES[0];
             }
             const upload = coerceImageValue(gtObj.imageData);
-            const urlText = unwrapMeasureText(String(gtObj.imageUrl ?? ""));
-            const svgText = unwrapMeasureText(String(gtObj.svgMarkup ?? ""));
-            if (upload.url) {
-                this.grandTotal.imageData.value = upload;
-                this.grandTotal.imageUrl.value = upload.url;
-            } else if (urlText) {
+            const urlText = unwrapMeasureText(
+                typeof gtObj.imageUrl === "string" ? gtObj.imageUrl : String(gtObj.imageUrl ?? ""),
+            );
+            const svgText = unwrapMeasureText(
+                typeof gtObj.svgMarkup === "string" ? gtObj.svgMarkup : String(gtObj.svgMarkup ?? ""),
+            );
+            const resolvedUrl = upload.url || urlText;
+            if (resolvedUrl) {
                 this.grandTotal.imageData.value = {
-                    name: "image",
-                    url: urlText,
-                    scaling: "normal",
+                    name: upload.name || "image",
+                    url: resolvedUrl,
+                    scaling: upload.scaling || "normal",
                 };
-                this.grandTotal.imageUrl.value = urlText;
+                this.grandTotal.imageUrl.value = resolvedUrl;
+            }
+            const rawUpload = this.grandTotal.imageData.value as unknown;
+            if (typeof rawUpload === "string" && rawUpload.trim()) {
+                const coerced = coerceImageValue(rawUpload);
+                if (coerced.url) {
+                    this.grandTotal.imageData.value = coerced;
+                    this.grandTotal.imageUrl.value = coerced.url;
+                }
             }
             if (svgText) {
                 this.grandTotal.svgMarkup.value = svgText;
@@ -549,7 +584,13 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         }
         const fromUpload = imageValueToStorage(this.categoryImages.imageData.value);
         const fromUrl = unwrapMeasureText(this.categoryImages.imageUrl.value || "");
-        const imageUrl = fromUpload || fromUrl;
+        // Fallback: imagem já salva no mapa da categoria selecionada.
+        const selected = this.getSelectedCategoryName();
+        const fromMap =
+            selected && this.getCategoryImageType() === "png"
+                ? findCategoryMeta(this.getCategoryMetaMap(), selected)?.imageUrl || ""
+                : "";
+        const imageUrl = fromUpload || fromUrl || fromMap || "";
         return {
             imageUrl,
             imageName: this.categoryImages.imageData.value?.name || (imageUrl ? "image" : ""),
@@ -562,11 +603,15 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         let map = this.getCategoryMetaMap();
         if (selected) {
             const payload = this.getEditorImagePayload();
-            map = upsertCategoryMeta(map, selected, {
+            const patch: Parameters<typeof upsertCategoryMeta>[2] = {
                 title: this.categoryImages.categoryTitle.value || "",
-                imageUrl: payload.imageUrl || "",
-                imageName: payload.imageName || "",
-            });
+            };
+            // Só grava/atualiza imagem quando há conteúdo — nunca apaga no sync vazio.
+            if (payload.imageUrl) {
+                patch.imageUrl = payload.imageUrl;
+                patch.imageName = payload.imageName || "image";
+            }
+            map = upsertCategoryMeta(map, selected, patch);
         }
         return serializeCategoryMetaMap(map);
     }
