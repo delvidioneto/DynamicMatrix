@@ -328,6 +328,24 @@ function categoryCellHtml(
     return `<div class="dkm-cat${tipClass}${fillClass}${place === "above" ? " dkm-cat-above" : ""}"${tip}>${inner}</div>`;
 }
 
+/**
+ * Fragmento CSS de tipografia: emite apenas o que foi definido,
+ * preservando herança (ex.: negrito da linha de Total Geral via CSS).
+ */
+function textStyleCss(
+    family?: string,
+    italic?: boolean,
+    underline?: boolean,
+    weight?: string,
+): string {
+    return (
+        (family ? `font-family:${esc(family)};` : "") +
+        (weight ? `font-weight:${weight};` : "") +
+        (italic ? "font-style:italic;" : "") +
+        (underline ? "text-decoration:underline;" : "")
+    );
+}
+
 function iconGlyph(
     icons: string | undefined,
     raw: number | null,
@@ -437,6 +455,14 @@ function kpiCellHtml(
     const comps = visibleComps
         .map((c) => {
             const fontColor = c.fontColor ?? fallbackCompColor;
+            // Tipografia do complemento: só emite o que o usuário definiu —
+            // undefined herda o padrão (ex.: bold do Total Geral via CSS).
+            const compTypo = textStyleCss(
+                c.fontFamily || style.valueFontFamily || "",
+                c.italic,
+                c.underline,
+                c.bold === undefined ? "" : c.bold ? "700" : "400",
+            );
             const back = c.backColor ? `background:${c.backColor};` : "";
             const icon = iconGlyph(c.icons, c.value.raw);
             const href = safeHttpUrl(c.webUrl) ?? safeHttpUrl(String(c.value.raw ?? ""));
@@ -456,14 +482,27 @@ function kpiCellHtml(
                 `<span class="dkm-comp-label" style="font-size:${labelSize}px;color:${labelColor}">${esc(c.label || c.displayName)}</span>` +
                 `<span class="dkm-comp-value-wrap">` +
                 bar +
-                `<span class="dkm-comp-value" style="font-size:${valueSize}px;color:${fontColor}">${icon}${valueInner}</span>` +
+                `<span class="dkm-comp-value" style="font-size:${valueSize}px;color:${fontColor};${compTypo}">${icon}${valueInner}</span>` +
                 `</span></div>`
             );
         })
         .join("");
 
+    // Tipografia do valor principal: override por KPI > seção Valores.
+    const primaryWeight =
+        col.primaryBold === undefined
+            ? style.valueFontWeight || "700"
+            : col.primaryBold
+              ? "700"
+              : "400";
+    const primaryTypo = textStyleCss(
+        col.primaryFontFamily || style.valueFontFamily || "",
+        col.primaryItalic ?? style.valueItalic,
+        col.primaryUnderline ?? style.valueUnderline,
+        primaryWeight,
+    );
     const primary = cell.primary.text
-        ? `<div class="dkm-primary" style="font-size:${primarySize}px;color:${primaryColor};font-weight:${style.fontWeight === "400" ? "700" : style.fontWeight}">${esc(cell.primary.text)}</div>`
+        ? `<div class="dkm-primary" style="font-size:${primarySize}px;color:${primaryColor};${primaryTypo}">${esc(cell.primary.text)}</div>`
         : `<div class="dkm-primary dkm-blank">—</div>`;
 
     const bodyHtml = primary + (comps ? `<div class="dkm-comps">${comps}</div>` : "");
@@ -529,7 +568,10 @@ function renderRow(
     const bg = rowBackground(style, index, isTotal);
     const fontSize = isTotal ? style.grandTotalFontSize : style.categoryFontSize;
     const fontColor = isTotal ? style.grandTotalFontColor : style.categoryFontColor;
-    const fontWeight = isTotal ? "700" : style.categoryFontWeight;
+    const fontWeight = isTotal ? style.grandTotalFontWeight || "700" : style.categoryFontWeight;
+    const catTypo = isTotal
+        ? textStyleCss(style.grandTotalFontFamily, style.grandTotalItalic, style.grandTotalUnderline)
+        : textStyleCss(style.categoryFontFamily, style.categoryItalic, style.categoryUnderline);
     const align = isTotal ? style.grandTotalAlignment : style.categoryAlignment;
     const rowRadius = style.rowBorderRadius;
     const colRadius = style.columnBorderRadius;
@@ -558,7 +600,7 @@ function renderRow(
 
     return (
         `<div class="dkm-row${isTotal ? " dkm-row-total" : ""}" style="--row-bg:${bg};--row-border-color:${style.rowBorderColor};--row-border-width:${style.rowBorderWidth}px;--row-radius:${rowRadius}px;--col-border-color:${style.columnBorderColor};--col-border-width:${style.columnBorderWidth}px;--col-radius:${colRadius}px;--col-gap:${style.columnGap}px;${isTotal ? `--row-min-height:${height}px;` : ""}min-height:${height}px;margin-bottom:${style.rowGap}px">` +
-        `<div class="dkm-cell dkm-cat-cell" style="${totalCellMinH}font-size:${fontSize}px;color:${fontColor};font-weight:${fontWeight};text-align:${align}">${categoryCellHtml(row, style, isTotal, catW)}</div>` +
+        `<div class="dkm-cell dkm-cat-cell" style="${totalCellMinH}font-size:${fontSize}px;color:${fontColor};font-weight:${fontWeight};${catTypo}text-align:${align}">${categoryCellHtml(row, style, isTotal, catW)}</div>` +
         cells +
         `</div>`
     );
@@ -571,8 +613,13 @@ function renderHeader(columns: KpiColumnConfig[], style: ResolvedVisualStyle): s
             return `<div class="dkm-cell dkm-head-cell" style="color:${color}">${esc(col.title || col.displayName)}</div>`;
         })
         .join("");
+    const headTypo = textStyleCss(
+        style.headerFontFamily,
+        style.headerItalic,
+        style.headerUnderline,
+    );
     return (
-        `<div class="dkm-row dkm-header" style="background:${style.headerBackground};font-size:${style.headerFontSize}px;font-weight:${style.headerFontWeight};color:${style.headerFontColor}">` +
+        `<div class="dkm-row dkm-header" style="background:${style.headerBackground};font-size:${style.headerFontSize}px;font-weight:${style.headerFontWeight};${headTypo}color:${style.headerFontColor}">` +
         `<div class="dkm-cell dkm-cat-cell dkm-head-cell"></div>` +
         heads +
         `</div>`

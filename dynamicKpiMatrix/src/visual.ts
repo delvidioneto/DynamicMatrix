@@ -169,7 +169,12 @@ export class Visual implements IVisual {
         this.formattingSettings.values.onPreProcess();
         const model = this.formattingSettingsService.buildFormattingModel(this.formattingSettings);
         if (this.lastView?.columns.length) {
-            const card = buildKpiContainerCard(this.lastView.columns, this.lastView.complementOptions);
+            const baseStyle = this.formattingSettings.toResolvedStyle();
+            const card = buildKpiContainerCard(
+                this.lastView.columns,
+                this.lastView.complementOptions,
+                baseStyle.valueFontFamily || baseStyle.fontFamily,
+            );
             if (card) {
                 const anchor = model.cards.findIndex(
                     (item) => "uid" in item && item.uid === "values-card",

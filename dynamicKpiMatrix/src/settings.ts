@@ -116,6 +116,40 @@ function dropdown(
     });
 }
 
+/**
+ * Controle de fonte padrão do Power BI (família + tamanho + N/I/S).
+ * Propriedades persistidas: fontFamily, fontSize, bold, italic, underline.
+ */
+function fontControl(name: string, size: number, bold: boolean) {
+    return new formattingSettings.FontControl({
+        name,
+        displayName: "Fonte",
+        fontFamily: new formattingSettings.FontPicker({
+            name: "fontFamily",
+            value: defaultStyle.fontFamily,
+        }),
+        fontSize: new formattingSettings.NumUpDown({
+            name: "fontSize",
+            displayName: "Tamanho",
+            value: size,
+        }),
+        bold: new formattingSettings.ToggleSwitch({ name: "bold", value: bold }),
+        italic: new formattingSettings.ToggleSwitch({ name: "italic", value: false }),
+        underline: new formattingSettings.ToggleSwitch({ name: "underline", value: false }),
+    });
+}
+
+/**
+ * Peso efetivo: o toggle Negrito manda, mas preserva o peso legado
+ * (Regular/Semibold/Bold) persistido em relatórios antigos.
+ */
+function boldWeight(bold: boolean | undefined, legacyWeight: string): string {
+    if (!bold) {
+        return "400";
+    }
+    return legacyWeight !== "400" ? legacyWeight : "700";
+}
+
 /** Texto persistido em object property: string crua ou item de dropdown `{ value }`. */
 export function readStoredText(value: unknown): string {
     if (typeof value === "string") {
@@ -213,18 +247,24 @@ class CategoriesColumnGroup extends FormattingSettingsGroup {
 }
 
 class CategoriesTextGroup extends FormattingSettingsGroup {
-    fontSize = num("fontSize", "Tamanho da fonte", defaultStyle.categoryFontSize);
+    font = fontControl(
+        "categoriesFont",
+        defaultStyle.categoryFontSize,
+        defaultStyle.categoryFontWeight !== "400",
+    );
     fontColor = color("fontColor", "Cor da fonte", defaultStyle.categoryFontColor);
+    /** Legado (oculto): peso persistido em relatórios antigos ainda é respeitado. */
     fontWeight = dropdown("fontWeight", "Peso da fonte", defaultStyle.categoryFontWeight, WEIGHTS);
     alignment = dropdown("alignment", "Alinhamento", defaultStyle.categoryAlignment, ALIGNS);
 
     name = "categoriesText";
     displayName = "Texto";
     collapsible = true;
-    slices: FormattingSettingsSlice[] = [this.fontSize, this.fontColor, this.fontWeight, this.alignment];
+    slices: FormattingSettingsSlice[] = [this.font, this.fontColor, this.fontWeight, this.alignment];
 
     constructor() {
         super({ name: "categoriesText", displayName: "Texto", slices: [] });
+        this.fontWeight.visible = false;
     }
 }
 
@@ -340,7 +380,8 @@ class GrandTotalCard extends FormattingSettingsCompositeCard {
         value: "",
         placeholder: "",
     });
-    fontSize = num("fontSize", "Tamanho da fonte", defaultStyle.grandTotalFontSize);
+    /** Negrito ligado por padrão: a linha de total sempre foi renderizada em bold. */
+    font = fontControl("grandTotalFont", defaultStyle.grandTotalFontSize, true);
     fontColor = color("fontColor", "Cor da fonte", defaultStyle.grandTotalFontColor);
     background = color("background", "Cor de fundo", defaultStyle.grandTotalBackground);
     rowHeight = num("rowHeight", "Altura da linha", defaultStyle.grandTotalRowHeight);
@@ -369,7 +410,7 @@ class GrandTotalCard extends FormattingSettingsCompositeCard {
             name: "grandTotalText",
             displayName: "Texto",
             collapsible: true,
-            slices: [this.fontSize, this.fontColor, this.alignment],
+            slices: [this.font, this.fontColor, this.alignment],
         }),
         new FormattingSettingsGroup({
             name: "grandTotalCell",
@@ -478,7 +519,8 @@ class ColumnsCard extends FormattingSettingsCompositeCard {
 }
 
 class ValuesCard extends FormattingSettingsCompositeCard {
-    fontSize = num("fontSize", "Tamanho do texto", defaultStyle.valueFontSize);
+    /** Negrito ligado por padrão: o valor principal sempre foi renderizado em bold. */
+    font = fontControl("valuesFont", defaultStyle.valueFontSize, true);
     fontColor = color("fontColor", "Cor do texto", defaultStyle.valueFontColor);
     alignment = dropdown("alignment", "Alinhamento", defaultStyle.valueAlignment, ALIGNS);
     displayUnits = new formattingSettings.AutoDropdown({
@@ -518,7 +560,7 @@ class ValuesCard extends FormattingSettingsCompositeCard {
             name: "valuesText",
             displayName: "Texto",
             collapsible: true,
-            slices: [this.fontSize, this.fontColor, this.alignment],
+            slices: [this.font, this.fontColor, this.alignment],
         }),
         new FormattingSettingsGroup({
             name: "valuesNumber",
@@ -563,9 +605,14 @@ class ValuesCard extends FormattingSettingsCompositeCard {
 }
 
 class HeaderCard extends FormattingSettingsCompositeCard {
-    fontSize = num("fontSize", "Tamanho", defaultStyle.headerFontSize);
+    font = fontControl(
+        "headerFont",
+        defaultStyle.headerFontSize,
+        defaultStyle.headerFontWeight !== "400",
+    );
     fontColor = color("fontColor", "Cor", defaultStyle.headerFontColor);
     background = color("background", "Fundo", defaultStyle.headerBackground);
+    /** Legado (oculto): peso persistido em relatórios antigos ainda é respeitado. */
     fontWeight = dropdown("fontWeight", "Peso", defaultStyle.headerFontWeight, WEIGHTS);
 
     name = "header";
@@ -575,7 +622,7 @@ class HeaderCard extends FormattingSettingsCompositeCard {
             name: "headerText",
             displayName: "Texto",
             collapsible: true,
-            slices: [this.fontSize, this.fontColor, this.fontWeight],
+            slices: [this.font, this.fontColor, this.fontWeight],
         }),
         new FormattingSettingsGroup({
             name: "headerBackground",
@@ -584,6 +631,11 @@ class HeaderCard extends FormattingSettingsCompositeCard {
             slices: [this.background],
         }),
     ];
+
+    constructor() {
+        super();
+        this.fontWeight.visible = false;
+    }
 }
 
 class SubTotalsCard extends FormattingSettingsCard {
@@ -653,6 +705,8 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         if (!objects) {
             return;
         }
+
+        this.syncFontControls(objects);
 
         const catObj = objects.categories as Record<string, unknown> | undefined;
         const legacyObj = objects.categoryImages as Record<string, unknown> | undefined;
@@ -737,6 +791,40 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
                 this.grandTotal.svgMarkup.value = svgText;
             }
         }
+    }
+
+    /**
+     * Compatibilidade dos controles de fonte com relatórios antigos:
+     * - família não persistida → herda a família do cartão Geral;
+     * - negrito não persistido → deriva do peso legado (Regular/Semibold/Bold).
+     * Assim a aparência atual não muda até o usuário tocar nos novos controles.
+     */
+    private syncFontControls(objects: powerbi.DataViewObjects): void {
+        const generalFamily = String(this.general.fontFamily.value || defaultStyle.fontFamily);
+        const sync = (
+            obj: Record<string, unknown> | undefined,
+            font: formattingSettings.FontControl,
+            legacyWeight?: string,
+        ) => {
+            if (obj?.fontFamily === undefined) {
+                font.fontFamily.value = generalFamily;
+            }
+            if (obj?.bold === undefined && legacyWeight !== undefined && font.bold) {
+                font.bold.value = legacyWeight !== "400";
+            }
+        };
+        sync(
+            objects.header as Record<string, unknown> | undefined,
+            this.header.font,
+            String(this.header.fontWeight.value.value),
+        );
+        sync(
+            objects.categories as Record<string, unknown> | undefined,
+            this.categories.texto.font,
+            String(this.categories.texto.fontWeight.value.value),
+        );
+        sync(objects.values as Record<string, unknown> | undefined, this.values.font);
+        sync(objects.grandTotal as Record<string, unknown> | undefined, this.grandTotal.font);
     }
 
     public ensureSelectedCategoryItem(name: string): void {
@@ -1021,9 +1109,15 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             rowHeight: this.rows.rowHeight.value || this.general.rowHeight.value,
             rowGap: this.rows.rowGap.value || this.general.rowGap.value,
             categoryWidth: coluna.width.value,
-            categoryFontSize: texto.fontSize.value,
+            categoryFontSize: texto.font.fontSize.value,
             categoryFontColor: texto.fontColor.value.value,
-            categoryFontWeight: String(texto.fontWeight.value.value),
+            categoryFontWeight: boldWeight(
+                texto.font.bold?.value,
+                String(texto.fontWeight.value.value),
+            ),
+            categoryFontFamily: String(texto.font.fontFamily.value || ""),
+            categoryItalic: Boolean(texto.font.italic?.value),
+            categoryUnderline: Boolean(texto.font.underline?.value),
             categoryAlignment: String(texto.alignment.value.value) as Align,
             imageSize: icone.imageSize.value,
             imagePlacement: String(icone.imagePlacement.value.value) as ImagePlacement,
@@ -1036,8 +1130,12 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             grandTotalImageType: this.getGrandTotalImageType(),
             grandTotalIconQueryName: this.getGrandTotalIconQueryName(),
             grandTotalImageData: grandImage,
-            grandTotalFontSize: this.grandTotal.fontSize.value,
+            grandTotalFontSize: this.grandTotal.font.fontSize.value,
             grandTotalFontColor: this.grandTotal.fontColor.value.value,
+            grandTotalFontFamily: String(this.grandTotal.font.fontFamily.value || ""),
+            grandTotalFontWeight: this.grandTotal.font.bold?.value ? "700" : "400",
+            grandTotalItalic: Boolean(this.grandTotal.font.italic?.value),
+            grandTotalUnderline: Boolean(this.grandTotal.font.underline?.value),
             grandTotalBackground: this.grandTotal.background.value.value,
             grandTotalRowHeight: this.grandTotal.rowHeight.value,
             grandTotalAlignment: String(this.grandTotal.alignment.value.value) as Align,
@@ -1056,8 +1154,16 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             columnBorderRadius: this.columns.borderRadius.value,
             columnWidth: Math.max(0, this.columns.columnWidth.value),
             columnGap: this.columns.columnGap.value,
-            valueFontSize: this.values.fontSize.value,
+            valueFontSize: this.values.font.fontSize.value,
             valueFontColor: this.values.fontColor.value.value,
+            valueFontFamily: String(this.values.font.fontFamily.value || ""),
+            // Mantém o comportamento antigo: bold padrão usa o peso do Geral (mín. 700).
+            valueFontWeight: boldWeight(
+                this.values.font.bold?.value,
+                String(this.general.fontWeight.value.value),
+            ),
+            valueItalic: Boolean(this.values.font.italic?.value),
+            valueUnderline: Boolean(this.values.font.underline?.value),
             valueAlignment: String(this.values.alignment.value.value) as Align,
             valueDisplayUnits: Number(this.values.displayUnits.value ?? 0),
             valuePrecision: this.values.precision.value,
@@ -1076,10 +1182,16 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
             valueBorderColor: this.values.borderColor.value.value,
             valueBorderWidth: this.values.borderWidth.value,
             valueBorderRadius: this.values.borderRadius.value,
-            headerFontSize: this.header.fontSize.value,
+            headerFontSize: this.header.font.fontSize.value,
             headerFontColor: this.header.fontColor.value.value,
             headerBackground: this.header.background.value.value,
-            headerFontWeight: String(this.header.fontWeight.value.value),
+            headerFontWeight: boldWeight(
+                this.header.font.bold?.value,
+                String(this.header.fontWeight.value.value),
+            ),
+            headerFontFamily: String(this.header.font.fontFamily.value || ""),
+            headerItalic: Boolean(this.header.font.italic?.value),
+            headerUnderline: Boolean(this.header.font.underline?.value),
             tooltipEnabled: this.tooltip.enabled.value,
             categoryImages: images,
             categoryTitles: titles,

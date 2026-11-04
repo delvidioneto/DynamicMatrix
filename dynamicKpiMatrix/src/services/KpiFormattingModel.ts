@@ -136,6 +136,35 @@ function toggleSlice(
     };
 }
 
+/** Controle de fonte padrão do Power BI (família + tamanho + N/I/S) para kpiStyle. */
+function fontControlSlice(
+    uid: string,
+    displayName: string,
+    props: { family: string; size: string; bold: string; italic: string; underline: string },
+    values: { family: string; size: number; bold: boolean; italic: boolean; underline: boolean },
+    queryName: string,
+): powerbi.visuals.FormattingSlice {
+    const descriptor = (propertyName: string) => ({
+        objectName: "kpiStyle",
+        propertyName,
+        selector: { metadata: queryName },
+    });
+    return {
+        uid,
+        displayName,
+        control: {
+            type: powerbi.visuals.FormattingComponent.FontControl,
+            properties: {
+                fontFamily: { descriptor: descriptor(props.family), value: values.family },
+                fontSize: { descriptor: descriptor(props.size), value: values.size },
+                bold: { descriptor: descriptor(props.bold), value: values.bold },
+                italic: { descriptor: descriptor(props.italic), value: values.italic },
+                underline: { descriptor: descriptor(props.underline), value: values.underline },
+            },
+        },
+    } as powerbi.visuals.FormattingSlice;
+}
+
 /** ColorPicker com botão fx (formatação condicional nativa, como na Matrix). */
 function colorCfSlice(
     uid: string,
@@ -177,6 +206,7 @@ function buildComplementSlices(
     active: ComplementSlot | undefined,
     fallbackFontSize: number,
     complementItems: powerbi.IEnumMember[],
+    baseFontFamily: string,
 ): powerbi.visuals.FormattingSlice[] {
     const prefix = `kpi_${index}_s${slot}`;
     return [
@@ -203,11 +233,23 @@ function buildComplementSlices(
             active?.label ?? "",
             q,
         ),
-        numSlice(
-            `${prefix}_fs`,
-            "Tamanho da fonte",
-            `complement${slot}FontSize`,
-            active?.fontSize ?? fallbackFontSize,
+        fontControlSlice(
+            `${prefix}_font`,
+            "Fonte",
+            {
+                family: `complement${slot}FontFamily`,
+                size: `complement${slot}FontSize`,
+                bold: `complement${slot}Bold`,
+                italic: `complement${slot}Italic`,
+                underline: `complement${slot}Underline`,
+            },
+            {
+                family: active?.fontFamily ?? baseFontFamily,
+                size: active?.fontSize ?? fallbackFontSize,
+                bold: active?.bold ?? false,
+                italic: active?.italic ?? false,
+                underline: active?.underline ?? false,
+            },
             q,
         ),
         colorCfSlice(
@@ -259,6 +301,7 @@ function buildComplementSlices(
 export function buildKpiContainerCard(
     columns: KpiColumnConfig[],
     complementOptions: Array<{ queryName: string; displayName: string }>,
+    baseFontFamily = "Segoe UI",
 ): powerbi.visuals.FormattingCard | null {
     if (!columns.length) {
         return null;
@@ -310,11 +353,24 @@ export function buildKpiContainerCard(
                     uid: `kpi_${index}_primaryGroup_uid`,
                     collapsible: true,
                     slices: [
-                        numSlice(
-                            `kpi_${index}_ps`,
-                            "Fonte principal",
-                            "primaryFontSize",
-                            col.primaryFontSize ?? 14,
+                        fontControlSlice(
+                            `kpi_${index}_pfont`,
+                            "Fonte",
+                            {
+                                family: "primaryFontFamily",
+                                size: "primaryFontSize",
+                                bold: "primaryBold",
+                                italic: "primaryItalic",
+                                underline: "primaryUnderline",
+                            },
+                            {
+                                family: col.primaryFontFamily ?? baseFontFamily,
+                                size: col.primaryFontSize ?? 14,
+                                // Valor principal sempre foi renderizado em negrito.
+                                bold: col.primaryBold ?? true,
+                                italic: col.primaryItalic ?? false,
+                                underline: col.primaryUnderline ?? false,
+                            },
                             q,
                         ),
                         colorCfSlice(
@@ -344,6 +400,7 @@ export function buildKpiContainerCard(
                         slotConfig(col, slot),
                         fallbackFontSize,
                         complementItems,
+                        baseFontFamily,
                     ),
                 },
             ],

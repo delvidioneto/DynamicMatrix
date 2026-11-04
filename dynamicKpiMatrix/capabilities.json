@@ -57,7 +57,11 @@
         "categories": {
             "properties": {
                 "width": { "type": { "numeric": true } },
+                "fontFamily": { "displayName": "Fonte", "type": { "formatting": { "fontFamily": true } } },
                 "fontSize": { "type": { "numeric": true } },
+                "bold": { "displayName": "Negrito", "type": { "bool": true } },
+                "italic": { "displayName": "Itálico", "type": { "bool": true } },
+                "underline": { "displayName": "Sublinhado", "type": { "bool": true } },
                 "fontColor": { "type": { "fill": { "solid": { "color": true } } } },
                 "fontWeight": {
                     "type": {
@@ -170,7 +174,11 @@
                 "imageData": { "displayName": "Upload PNG", "type": { "text": true } },
                 "imageUrl": { "displayName": "URL / data URI", "type": { "text": true } },
                 "svgMarkup": { "displayName": "SVG (texto)", "type": { "text": true } },
+                "fontFamily": { "displayName": "Fonte", "type": { "formatting": { "fontFamily": true } } },
                 "fontSize": { "type": { "numeric": true } },
+                "bold": { "displayName": "Negrito", "type": { "bool": true } },
+                "italic": { "displayName": "Itálico", "type": { "bool": true } },
+                "underline": { "displayName": "Sublinhado", "type": { "bool": true } },
                 "fontColor": { "type": { "fill": { "solid": { "color": true } } } },
                 "background": { "type": { "fill": { "solid": { "color": true } } } },
                 "rowHeight": { "type": { "numeric": true } },
@@ -213,7 +221,11 @@
         "values": {
             "displayName": "Valores",
             "properties": {
+                "fontFamily": { "displayName": "Fonte", "type": { "formatting": { "fontFamily": true } } },
                 "fontSize": { "displayName": "Tamanho do texto", "type": { "numeric": true } },
+                "bold": { "displayName": "Negrito", "type": { "bool": true } },
+                "italic": { "displayName": "Itálico", "type": { "bool": true } },
+                "underline": { "displayName": "Sublinhado", "type": { "bool": true } },
                 "fontColor": { "displayName": "Cor do texto", "type": { "fill": { "solid": { "color": true } } } },
                 "alignment": {
                     "displayName": "Alinhamento",
@@ -266,7 +278,11 @@
         },
         "header": {
             "properties": {
+                "fontFamily": { "displayName": "Fonte", "type": { "formatting": { "fontFamily": true } } },
                 "fontSize": { "type": { "numeric": true } },
+                "bold": { "displayName": "Negrito", "type": { "bool": true } },
+                "italic": { "displayName": "Itálico", "type": { "bool": true } },
+                "underline": { "displayName": "Sublinhado", "type": { "bool": true } },
                 "fontColor": { "type": { "fill": { "solid": { "color": true } } } },
                 "background": { "type": { "fill": { "solid": { "color": true } } } },
                 "fontWeight": {
@@ -469,9 +485,21 @@
                 "minWidth": { "type": { "numeric": true } },
                 "maxWidth": { "type": { "numeric": true } },
                 "primaryFontSize": { "type": { "numeric": true } },
+                "primaryFontFamily": { "displayName": "Fonte do valor principal", "type": { "formatting": { "fontFamily": true } } },
+                "primaryBold": { "displayName": "Negrito (valor principal)", "type": { "bool": true } },
+                "primaryItalic": { "displayName": "Itálico (valor principal)", "type": { "bool": true } },
+                "primaryUnderline": { "displayName": "Sublinhado (valor principal)", "type": { "bool": true } },
                 "complementFontSize": { "type": { "numeric": true } },
                 "complement1FontSize": { "displayName": "Tamanho da fonte 1", "type": { "numeric": true } },
                 "complement2FontSize": { "displayName": "Tamanho da fonte 2", "type": { "numeric": true } },
+                "complement1FontFamily": { "displayName": "Fonte 1", "type": { "formatting": { "fontFamily": true } } },
+                "complement2FontFamily": { "displayName": "Fonte 2", "type": { "formatting": { "fontFamily": true } } },
+                "complement1Bold": { "displayName": "Negrito 1", "type": { "bool": true } },
+                "complement2Bold": { "displayName": "Negrito 2", "type": { "bool": true } },
+                "complement1Italic": { "displayName": "Itálico 1", "type": { "bool": true } },
+                "complement2Italic": { "displayName": "Itálico 2", "type": { "bool": true } },
+                "complement1Underline": { "displayName": "Sublinhado 1", "type": { "bool": true } },
+                "complement2Underline": { "displayName": "Sublinhado 2", "type": { "bool": true } },
                 "complement3FontSize": { "displayName": "Tamanho da fonte 3", "type": { "numeric": true } },
                 "complement4FontSize": { "displayName": "Tamanho da fonte 4", "type": { "numeric": true } },
                 "labelFontSize": { "type": { "numeric": true } },

@@ -34,6 +34,45 @@ function assert(condition: unknown, message: string): asserts condition {
         precision: 1,
     });
     assert(millions.text.includes("M"), `millions got ${millions.text}`);
+
+    // Formato da medida manda nas casas; precisão do visual NÃO sobrescreve.
+    const currency0 = formatMeasureValue(1_782_000, "$#,0", {
+        displayUnits: DisplayUnits.None,
+        precision: 2,
+    });
+    assert(
+        currency0.text.includes("1") && !/[.,]\d/.test(currency0.text.replace(/\./g, "")),
+        `currency $#,0 with visual 2dp should have no decimals, got ${currency0.text}`,
+    );
+    assert(
+        !currency0.text.includes(","),
+        `currency $#,0 should not show decimal comma, got ${currency0.text}`,
+    );
+
+    const currency2 = formatMeasureValue(100, "$#,0.00", {
+        displayUnits: DisplayUnits.None,
+        precision: 0,
+    });
+    assert(
+        /,\d{2}$/.test(currency2.text) || /\.\d{2}$/.test(currency2.text),
+        `currency $#,0.00 should keep 2 decimals even if visual is 0, got ${currency2.text}`,
+    );
+
+    const pct0 = formatMeasureValue(0.0134, "0%", { precision: 2 });
+    assert(pct0.text === "1%", `percent 0% with visual 2dp got ${pct0.text}`);
+    const pct2 = formatMeasureValue(0.0134, "0.00%", { precision: 0 });
+    assert(pct2.text === "1.34%", `percent 0.00% with visual 0dp got ${pct2.text}`);
+
+    // Unidade diferente de None continua aplicando escala, mas com casas da medida.
+    const millionsFromFormat = formatMeasureValue(1_500_000, "$#,0", {
+        displayUnits: DisplayUnits.Millions,
+        precision: 2,
+    });
+    assert(millionsFromFormat.text.includes("M"), `forced millions got ${millionsFromFormat.text}`);
+    assert(
+        !millionsFromFormat.text.includes(","),
+        `forced millions with $#,0 should have no decimals, got ${millionsFromFormat.text}`,
+    );
 }
 
 // --- svg sanitize ---

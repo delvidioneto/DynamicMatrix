@@ -216,6 +216,10 @@ function buildCell(
             icons: slot.icons,
             webUrl: slot.webUrl,
             fontSize: slot.fontSize,
+            fontFamily: slot.fontFamily,
+            bold: slot.bold,
+            italic: slot.italic,
+            underline: slot.underline,
         };
     });
 

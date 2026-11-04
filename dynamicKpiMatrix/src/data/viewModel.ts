@@ -28,6 +28,11 @@ export interface ComplementSlot {
     icons?: ComplementIconSet;
     webUrl?: string;
     fontSize?: number;
+    /** Tipografia opcional (undefined = herdar aparência padrão). */
+    fontFamily?: string;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
 }
 
 export interface KpiColumnConfig {
@@ -43,6 +48,11 @@ export interface KpiColumnConfig {
     minWidth: number;
     maxWidth: number;
     primaryFontSize?: number;
+    /** Tipografia do valor principal (undefined = herdar da seção Valores). */
+    primaryFontFamily?: string;
+    primaryBold?: boolean;
+    primaryItalic?: boolean;
+    primaryUnderline?: boolean;
     complementFontSize?: number;
     labelFontSize?: number;
     primaryColor?: string;
@@ -90,6 +100,10 @@ export interface ComplementValue {
     icons?: ComplementIconSet;
     webUrl?: string;
     fontSize?: number;
+    fontFamily?: string;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
 }
 
 export interface KpiCellData {
@@ -147,6 +161,9 @@ export interface ResolvedVisualStyle {
     categoryFontSize: number;
     categoryFontColor: string;
     categoryFontWeight: string;
+    categoryFontFamily: string;
+    categoryItalic: boolean;
+    categoryUnderline: boolean;
     categoryAlignment: Align;
     imageSize: number;
     imagePlacement: ImagePlacement;
@@ -163,6 +180,10 @@ export interface ResolvedVisualStyle {
     grandTotalImageData: string;
     grandTotalFontSize: number;
     grandTotalFontColor: string;
+    grandTotalFontFamily: string;
+    grandTotalFontWeight: string;
+    grandTotalItalic: boolean;
+    grandTotalUnderline: boolean;
     grandTotalBackground: string;
     grandTotalRowHeight: number;
     grandTotalAlignment: Align;
@@ -183,6 +204,11 @@ export interface ResolvedVisualStyle {
     columnGap: number;
     valueFontSize: number;
     valueFontColor: string;
+    valueFontFamily: string;
+    /** Peso efetivo do valor principal (negrito do controle de fonte). */
+    valueFontWeight: string;
+    valueItalic: boolean;
+    valueUnderline: boolean;
     valueAlignment: Align;
     valueDisplayUnits: number;
     valuePrecision: number;
@@ -202,6 +228,9 @@ export interface ResolvedVisualStyle {
     headerFontColor: string;
     headerBackground: string;
     headerFontWeight: string;
+    headerFontFamily: string;
+    headerItalic: boolean;
+    headerUnderline: boolean;
     tooltipEnabled: boolean;
     /** Legado: data URI por categoria. */
     categoryImages: Record<string, string>;
@@ -225,6 +254,9 @@ export const defaultStyle: ResolvedVisualStyle = {
     categoryFontSize: 13,
     categoryFontColor: "#1F1F1F",
     categoryFontWeight: "600",
+    categoryFontFamily: "",
+    categoryItalic: false,
+    categoryUnderline: false,
     categoryAlignment: "left",
     imageSize: 22,
     imagePlacement: "left",
@@ -239,6 +271,10 @@ export const defaultStyle: ResolvedVisualStyle = {
     grandTotalImageData: "",
     grandTotalFontSize: 13,
     grandTotalFontColor: "#111111",
+    grandTotalFontFamily: "",
+    grandTotalFontWeight: "700",
+    grandTotalItalic: false,
+    grandTotalUnderline: false,
     grandTotalBackground: "#EEF2F6",
     grandTotalRowHeight: 68,
     grandTotalAlignment: "left",
@@ -259,6 +295,10 @@ export const defaultStyle: ResolvedVisualStyle = {
     columnGap: 0,
     valueFontSize: 14,
     valueFontColor: "#1F1F1F",
+    valueFontFamily: "",
+    valueFontWeight: "700",
+    valueItalic: false,
+    valueUnderline: false,
     valueAlignment: "left",
     valueDisplayUnits: 0,
     valuePrecision: -1,
@@ -276,6 +316,9 @@ export const defaultStyle: ResolvedVisualStyle = {
     headerFontColor: "#5A5A5A",
     headerBackground: "#FFFFFF",
     headerFontWeight: "700",
+    headerFontFamily: "",
+    headerItalic: false,
+    headerUnderline: false,
     tooltipEnabled: true,
     categoryImages: {},
     categoryTitles: {},

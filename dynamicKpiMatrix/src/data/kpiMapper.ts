@@ -29,6 +29,17 @@ function asBool(value: unknown, fallback: boolean): boolean {
     return typeof value === "boolean" ? value : fallback;
 }
 
+/** Booleano opcional: undefined = não persistido (herda aparência padrão). */
+function asOptBool(value: unknown): boolean | undefined {
+    return typeof value === "boolean" ? value : undefined;
+}
+
+/** Texto opcional: undefined quando vazio/não persistido. */
+function asOptText(value: unknown): string | undefined {
+    const t = asText(value).trim();
+    return t || undefined;
+}
+
 export function solidColor(value: unknown): string | undefined {
     if (typeof value === "string" && value.trim()) {
         return value.trim();
@@ -138,6 +149,10 @@ function readSlotStyle(styleObjects: DataViewObjects | undefined, i: ComplementS
         icons: asIconSet(readProp(styleObjects, "kpiStyle", `complement${i}Icons`)),
         webUrl: asText(readProp(styleObjects, "kpiStyle", `complement${i}WebUrl`)),
         fontSize: Number.isFinite(fontSize) ? fontSize : undefined,
+        fontFamily: asOptText(readProp(styleObjects, "kpiStyle", `complement${i}FontFamily`)),
+        bold: asOptBool(readProp(styleObjects, "kpiStyle", `complement${i}Bold`)),
+        italic: asOptBool(readProp(styleObjects, "kpiStyle", `complement${i}Italic`)),
+        underline: asOptBool(readProp(styleObjects, "kpiStyle", `complement${i}Underline`)),
     };
 }
 
@@ -195,6 +210,10 @@ function complementSlots(
             icons: item.icons,
             webUrl: item.webUrl,
             fontSize: item.fontSize,
+            fontFamily: item.fontFamily,
+            bold: item.bold,
+            italic: item.italic,
+            underline: item.underline,
         });
     }
     return slots;
@@ -233,6 +252,10 @@ export function buildKpiColumns(
             minWidth: asNumber(readProp(objects, "kpiStyle", "minWidth"), defaultKpiStyle.minWidth),
             maxWidth: asNumber(readProp(objects, "kpiStyle", "maxWidth"), defaultKpiStyle.maxWidth),
             primaryFontSize: asNumber(readProp(objects, "kpiStyle", "primaryFontSize"), NaN) || undefined,
+            primaryFontFamily: asOptText(readProp(objects, "kpiStyle", "primaryFontFamily")),
+            primaryBold: asOptBool(readProp(objects, "kpiStyle", "primaryBold")),
+            primaryItalic: asOptBool(readProp(objects, "kpiStyle", "primaryItalic")),
+            primaryUnderline: asOptBool(readProp(objects, "kpiStyle", "primaryUnderline")),
             complementFontSize: asNumber(readProp(objects, "kpiStyle", "complementFontSize"), NaN) || undefined,
             labelFontSize: asNumber(readProp(objects, "kpiStyle", "labelFontSize"), NaN) || undefined,
             primaryColor: solidColor(readProp(objects, "kpiStyle", "primaryColor")),
