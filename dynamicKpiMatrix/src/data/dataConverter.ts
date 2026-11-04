@@ -208,7 +208,7 @@ function buildCell(
             label: slot.label,
             displayName: slot.displayName,
             queryName: slot.queryName,
-            value: formatMeasureValue(raw, slot.format ?? measure?.format, formatOpts),
+            value: formatMeasureValue(raw, slot.format ?? measure?.format),
             fontColor: slot.fontColor,
             backColor: slot.backColor,
             dataBars: slot.dataBars,
@@ -613,7 +613,7 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
                         changed = true;
                         return {
                             ...comp,
-                            value: formatMeasureValue(sum, slot?.format ?? comp.value.format, formatOpts),
+                            value: formatMeasureValue(sum, slot?.format ?? comp.value.format),
                         };
                     });
                     return changed ? { ...cell, complements } : cell;

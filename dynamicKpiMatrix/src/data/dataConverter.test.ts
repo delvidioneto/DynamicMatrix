@@ -73,6 +73,22 @@ function assert(condition: unknown, message: string): asserts condition {
         !millionsFromFormat.text.includes(","),
         `forced millions with $#,0 should have no decimals, got ${millionsFromFormat.text}`,
     );
+
+    // Sem formato de moeda, número grande NÃO vira $.
+    const plainLarge = formatMeasureValue(1_500_000, "#,0");
+    assert(!plainLarge.text.includes("$"), `non-currency must not get $, got ${plainLarge.text}`);
+
+    // Percentual da medida (ratio) não zera com precisão do visual.
+    const ibp = formatMeasureValue(0.0134, "0.00%", { displayUnits: DisplayUnits.Auto, precision: 2 });
+    assert(ibp.text === "1.34%", `IBP ratio must stay 1.34%, got ${ibp.text}`);
+
+    // Texto da medida passa direto.
+    const asText = formatMeasureValue("OK", "@");
+    assert(asText.text === "OK", `text measure got ${asText.text}`);
+
+    // Sem options (complemento / Indicadores): ignora casas do visual.
+    const complementPct = formatMeasureValue(0.0115, "0.00%");
+    assert(complementPct.text === "1.15%", `complement percent got ${complementPct.text}`);
 }
 
 // --- svg sanitize ---

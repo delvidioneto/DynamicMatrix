@@ -20,7 +20,14 @@ export interface ValueFormatOptions {
 }
 
 function isPercentFormat(format?: string): boolean {
-    return Boolean(format && format.includes("%"));
+    if (!format) {
+        return false;
+    }
+    if (format.includes("%")) {
+        return true;
+    }
+    const trimmed = format.trim();
+    return /^P\d*$/i.test(trimmed) || /percent/i.test(trimmed);
 }
 
 function isCurrencyFormat(format?: string): boolean {
@@ -28,6 +35,24 @@ function isCurrencyFormat(format?: string): boolean {
         return false;
     }
     return format.includes("$") || format.toLowerCase().includes("currency") || /¤/.test(format);
+}
+
+function currencyPrefix(format?: string): string {
+    if (!format || !isCurrencyFormat(format)) {
+        return "";
+    }
+    if (format.includes("R$")) {
+        return "R$";
+    }
+    return "$";
+}
+
+function isForcedDisplayUnit(displayUnits: number | undefined): boolean {
+    return (
+        displayUnits != null &&
+        displayUnits !== DisplayUnits.Auto &&
+        displayUnits !== DisplayUnits.None
+    );
 }
 
 function resolvePrecision(precision: number | undefined, fallback: number): number {
@@ -132,31 +157,30 @@ function formatScaled(
     return currency ? `$${withSuffix}` : withSuffix;
 }
 
-/** Compactação pt-BR legada (compatível com testes de moeda). */
-export function formatCompactMoney(value: number, precision = 0): string {
-    const abs = Math.abs(value);
-    let scaled = value;
-    let suffix = "";
-    if (abs >= 1e12) {
-        scaled = value / 1e9;
-        suffix = " T";
-    } else if (abs >= 1e9) {
-        scaled = value / 1e6;
-        suffix = " B";
-    } else if (abs >= 1e6) {
-        scaled = value / 1e3;
-        suffix = " MM";
+/**
+ * Formato da medida, sem unidade/precisão do visual.
+ * %, moeda, decimal e texto seguem o format string; sem format = número geral.
+ */
+function formatByMeasure(raw: number, format?: string): string {
+    if (isPercentFormat(format)) {
+        const digits = precisionFromFormat(format) ?? 2;
+        return `${(raw * 100).toFixed(digits)}%`;
     }
-    if (precision <= 0) {
-        const rounded = Math.round(scaled);
-        const grouped = String(Math.abs(rounded)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-        return `$${rounded < 0 ? "-" : ""}${grouped}${suffix}`;
+    const prefix = currencyPrefix(format);
+    const digits = precisionFromFormat(format);
+    if (digits !== undefined) {
+        const text = raw.toLocaleString("pt-BR", {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits,
+        });
+        return prefix ? `${prefix}${text}` : text;
     }
-    const text = Math.abs(scaled).toLocaleString("pt-BR", {
-        minimumFractionDigits: precision,
-        maximumFractionDigits: precision,
-    });
-    return `$${scaled < 0 ? "-" : ""}${text}${suffix}`;
+    if (Number.isInteger(raw)) {
+        const text = raw.toLocaleString("pt-BR");
+        return prefix ? `${prefix}${text}` : text;
+    }
+    const text = raw.toLocaleString("pt-BR", { maximumFractionDigits: 12 });
+    return prefix ? `${prefix}${text}` : text;
 }
 
 export function formatMeasureValue(
@@ -171,59 +195,22 @@ export function formatMeasureValue(
         return { raw: null, text: String(raw), format };
     }
 
-    const displayUnits = options?.displayUnits ?? DisplayUnits.Auto;
-    const currency = isCurrencyFormat(format);
-    const visualPrecision = options?.precision;
-
-    if (isPercentFormat(format)) {
-        const pct = Math.abs(raw) <= 2 ? raw * 100 : raw;
-        const { digits } = effectivePrecision(format, visualPrecision, 2);
-        return { raw, text: `${pct.toFixed(digits)}%`, format };
+    // Sem unidade forçada (Auto/Nenhum/ausente): só o formato da medida.
+    // Unidades de Valores só entram quando o usuário escolhe milhares/milhões/etc.
+    if (!isForcedDisplayUnit(options?.displayUnits) || isPercentFormat(format)) {
+        return { raw, text: formatByMeasure(raw, format), format };
     }
 
-    // Nenhum: número completo sem compactação — casas vêm da medida.
-    if (displayUnits === DisplayUnits.None) {
-        const { digits, fromFormat } = effectivePrecision(format, visualPrecision, currency ? 2 : 4);
-        const text = raw.toLocaleString("pt-BR", {
-            maximumFractionDigits: digits,
-            minimumFractionDigits: fromFormat ? digits : Number.isInteger(raw) ? 0 : undefined,
-        });
-        return { raw, text: currency ? `$${text}` : text, format };
-    }
-
-    // Auto sem unidade forçada: mantém compactação monetária legada para valores grandes.
-    if (displayUnits === DisplayUnits.Auto && (currency || Math.abs(raw) >= 100_000)) {
-        const { digits } = effectivePrecision(format, visualPrecision, 0);
-        return { raw, text: formatCompactMoney(raw, digits), format };
-    }
-
-    if (displayUnits === DisplayUnits.Auto && Math.abs(raw) < DisplayUnits.Thousands) {
-        const { digits, fromFormat } = effectivePrecision(
-            format,
-            visualPrecision,
-            Number.isInteger(raw) ? 0 : 4,
-        );
-        return {
-            raw,
-            text: !fromFormat && Number.isInteger(raw)
-                ? raw.toLocaleString("pt-BR")
-                : raw.toLocaleString("pt-BR", {
-                      maximumFractionDigits: digits,
-                      minimumFractionDigits: fromFormat ? digits : undefined,
-                  }),
-            format,
-        };
-    }
-
-    const { divisor, suffix } = unitFromSetting(displayUnits, Math.abs(raw));
-    const { digits, fromFormat } = effectivePrecision(
+    const { divisor, suffix } = unitFromSetting(options!.displayUnits as number, Math.abs(raw));
+    const fromFormat = precisionFromFormat(format);
+    const { digits } = effectivePrecision(
         format,
-        visualPrecision,
+        options?.precision,
         divisor === 1 ? (Number.isInteger(raw) ? 0 : 2) : 2,
     );
     return {
         raw,
-        text: formatScaled(raw, divisor, suffix, digits, currency, fromFormat),
+        text: formatScaled(raw, divisor, suffix, digits, isCurrencyFormat(format), fromFormat !== undefined),
         format,
     };
 }
