@@ -271,7 +271,7 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(view.totalRow, "fallback total exists");
     assert(view.totalRow!.cells[0].primary.raw === 25, `sum primary got ${view.totalRow!.cells[0].primary.raw}`);
     assert(view.totalRow!.cells[0].complements.length === 1, "total keeps complement slot");
-    assert(view.totalRow!.cells[0].complements[0].value.raw === 3, "fallback total keeps complement values");
+    assert(view.totalRow!.cells[0].complements[0].value.raw == null, "percent complement never summed manually");
     assert(view.totalRow!.cells[0].complements[0].label === "IBP", "total complement keeps label");
 }
 

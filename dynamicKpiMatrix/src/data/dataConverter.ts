@@ -413,8 +413,12 @@ function sumTotalFromRows(
                 primaryCount += 1;
             }
             cell.complements.forEach((comp, i) => {
-                // Fallback só quando o host não envia subtotal DAX: inclui complementos
-                // (como antes do ajuste do 186%). Com subtotal DAX, este caminho não roda.
+                const slotFormat = col.complements[i]?.format ?? "";
+                // Percentual não é aditivo (1,15% + 2,71% + ... = 6,94% errado).
+                // O valor certo vem do subtotal DAX; sem ele, melhor em branco que errado.
+                if (slotFormat.includes("%")) {
+                    return;
+                }
                 if (comp.value.raw != null && Number.isFinite(comp.value.raw)) {
                     complementSums[i].sum += comp.value.raw;
                     complementSums[i].count += 1;
@@ -571,8 +575,9 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
             totalRow.displayMode = options.grandTotalDisplayMode || "both";
             totalRow.isTotal = true;
 
-            // Se o subtotal DAX trouxe o KPI mas omitiu o complemento, preenche o slot
-            // vazio a partir das linhas (comportamento que existia antes do ajuste do 186%).
+            // Se o subtotal DAX trouxe o KPI mas omitiu um complemento ADITIVO
+            // (sem formato %), completa com a soma das linhas. Percentual nunca é
+            // somado manualmente: o valor certo só existe no contexto DAX de total.
             if (sorted.length) {
                 totalRow.cells = totalRow.cells.map((cell, colIndex) => {
                     const col = columns[colIndex];
@@ -582,6 +587,11 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
                     let changed = false;
                     const complements = cell.complements.map((comp, i) => {
                         if (comp.value.raw != null && comp.value.text) {
+                            return comp;
+                        }
+                        const slot = col.complements[i];
+                        const slotFormat = slot?.format ?? comp.value.format ?? "";
+                        if (slotFormat.includes("%")) {
                             return comp;
                         }
                         let sum = 0;
@@ -597,7 +607,6 @@ export function convertDataView(dataView: DataView | undefined, options: Convert
                             return comp;
                         }
                         changed = true;
-                        const slot = col.complements[i];
                         return {
                             ...comp,
                             value: formatMeasureValue(sum, slot?.format ?? comp.value.format, formatOpts),

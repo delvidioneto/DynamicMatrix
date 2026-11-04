@@ -521,6 +521,10 @@
         "subTotals": {
             "properties": {
                 "rowSubtotals": { "type": { "bool": true } },
+                "perRowLevel": { "type": { "bool": true } },
+                "columnSubtotals": { "type": { "bool": true } },
+                "perColumnLevel": { "type": { "bool": true } },
+                "levelSubtotalEnabled": { "type": { "bool": true } },
                 "rowSubtotalsType": {
                     "type": {
                         "enumeration": [
@@ -570,6 +574,34 @@
                 "propertyIdentifier": {
                     "objectName": "subTotals",
                     "propertyName": "rowSubtotals"
+                },
+                "defaultValue": true
+            },
+            "rowSubtotalsPerLevel": {
+                "propertyIdentifier": {
+                    "objectName": "subTotals",
+                    "propertyName": "perRowLevel"
+                },
+                "defaultValue": false
+            },
+            "columnSubtotals": {
+                "propertyIdentifier": {
+                    "objectName": "subTotals",
+                    "propertyName": "columnSubtotals"
+                },
+                "defaultValue": true
+            },
+            "columnSubtotalsPerLevel": {
+                "propertyIdentifier": {
+                    "objectName": "subTotals",
+                    "propertyName": "perColumnLevel"
+                },
+                "defaultValue": false
+            },
+            "levelSubtotalEnabled": {
+                "propertyIdentifier": {
+                    "objectName": "subTotals",
+                    "propertyName": "levelSubtotalEnabled"
                 },
                 "defaultValue": true
             },
