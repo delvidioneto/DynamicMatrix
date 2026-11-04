@@ -587,6 +587,11 @@ class HeaderCard extends FormattingSettingsCompositeCard {
 }
 
 class SubTotalsCard extends FormattingSettingsCard {
+    /**
+     * A requisição de subtotal DAX segue "Exibir Total Geral" (grandTotal.show) —
+     * mapeado em capabilities.json. Este toggle legado fica oculto para não
+     * permitir desligar o subtotal por engano (valores % dependem dele).
+     */
     rowSubtotals = toggle("rowSubtotals", "Solicitar subtotais (DAX)", true);
     rowSubtotalsType = dropdown("rowSubtotalsType", "Posição do total", "Top", [
         { value: "Top", displayName: "Topo" },
@@ -596,6 +601,11 @@ class SubTotalsCard extends FormattingSettingsCard {
     name = "subTotals";
     displayName = "Subtotais";
     slices: FormattingSettingsSlice[] = [this.rowSubtotals, this.rowSubtotalsType];
+
+    constructor() {
+        super();
+        this.rowSubtotals.visible = false;
+    }
 }
 
 class TooltipCard extends FormattingSettingsCard {

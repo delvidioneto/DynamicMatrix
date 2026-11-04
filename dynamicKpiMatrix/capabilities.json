@@ -572,8 +572,8 @@
         "matrix": {
             "rowSubtotals": {
                 "propertyIdentifier": {
-                    "objectName": "subTotals",
-                    "propertyName": "rowSubtotals"
+                    "objectName": "grandTotal",
+                    "propertyName": "show"
                 },
                 "defaultValue": true
             },
