@@ -347,28 +347,28 @@
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement1FontColor", "selector": ["category"] }
+                        "output": { "property": "complement1FontColor", "selector": ["kpis"] }
                     }
                 },
                 "complement2FontColorRule": {
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement2FontColor", "selector": ["category"] }
+                        "output": { "property": "complement2FontColor", "selector": ["kpis"] }
                     }
                 },
                 "complement3FontColorRule": {
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement3FontColor", "selector": ["category"] }
+                        "output": { "property": "complement3FontColor", "selector": ["kpis"] }
                     }
                 },
                 "complement4FontColorRule": {
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement4FontColor", "selector": ["category"] }
+                        "output": { "property": "complement4FontColor", "selector": ["kpis"] }
                     }
                 },
                 "complement1BackColor": { "displayName": "Cor de fundo 1", "type": { "fill": { "solid": { "color": true } } } },
@@ -379,28 +379,28 @@
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement1BackColor", "selector": ["category"] }
+                        "output": { "property": "complement1BackColor", "selector": ["kpis"] }
                     }
                 },
                 "complement2BackColorRule": {
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement2BackColor", "selector": ["category"] }
+                        "output": { "property": "complement2BackColor", "selector": ["kpis"] }
                     }
                 },
                 "complement3BackColorRule": {
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement3BackColor", "selector": ["category"] }
+                        "output": { "property": "complement3BackColor", "selector": ["kpis"] }
                     }
                 },
                 "complement4BackColorRule": {
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement4BackColor", "selector": ["category"] }
+                        "output": { "property": "complement4BackColor", "selector": ["kpis"] }
                     }
                 },
                 "complement1DataBars": { "displayName": "Barras de dados 1", "type": { "bool": true } },
@@ -415,14 +415,14 @@
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement1DataBarColor", "selector": ["category"] }
+                        "output": { "property": "complement1DataBarColor", "selector": ["kpis"] }
                     }
                 },
                 "complement2DataBarColorRule": {
                     "type": { "fillRule": {} },
                     "rule": {
                         "inputRole": "complements",
-                        "output": { "property": "complement2DataBarColor", "selector": ["category"] }
+                        "output": { "property": "complement2DataBarColor", "selector": ["kpis"] }
                     }
                 },
                 "complement1Icons": {

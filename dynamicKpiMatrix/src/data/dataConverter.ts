@@ -233,25 +233,10 @@ function buildCell(
     };
 
     const valueObjects = readTotalValueObjects(totalNodes, column.valueSourceIndex);
-    // Fontes de CF por complemento: objects da própria medida do slot.
-    // O nó da categoria (node.objects) recebe regras com selector ["category"].
-    // Não misturar objects de outras medidas — cada slot tem propriedades próprias.
-    const complementSources = column.complements.map((slot) => {
-        const measure = measures.find((m) => m.queryName === slot.queryName);
-        const idx = measure?.valueSourceIndex ?? -1;
-        if (idx < 0) {
-            return [];
-        }
-        return totalNodes.map((n) => readValueObjects(n, idx));
-    });
+    // CF de complemento: objects do valor deste KPI (selector ["kpis"] + metadata da coluna).
+    // Valor principal e fundo ainda aceitam a cor no nó da categoria.
     const rowObjects = totalNodes.map((n) => n?.objects);
-    cell = mergeCellObjectsColors(
-        cell,
-        column,
-        valueObjects,
-        rowObjects,
-        complementSources,
-    );
+    cell = mergeCellObjectsColors(cell, column, valueObjects, rowObjects);
     return applyConditionalColors(cell, column);
 }
 

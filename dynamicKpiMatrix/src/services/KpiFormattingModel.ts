@@ -173,6 +173,14 @@ function colorCfSlice(
     value: string,
     queryName: string,
 ): powerbi.visuals.FormattingSlice {
+    // O curinga avalia cada linha e o total. O metadata prende a regra a este KPI,
+    // então o Complemento 1 de A não compartilha a regra do Complemento 1 de B.
+    const selector: powerbi.data.Selector = {
+        ...dataViewWildcard.createDataViewWildcardSelector(
+            dataViewWildcard.DataViewWildcardMatchingOption.InstancesAndTotals,
+        ),
+        metadata: queryName,
+    };
     return {
         uid,
         displayName,
@@ -182,9 +190,7 @@ function colorCfSlice(
                 descriptor: {
                     objectName: "kpiStyle",
                     propertyName,
-                    selector: dataViewWildcard.createDataViewWildcardSelector(
-                        dataViewWildcard.DataViewWildcardMatchingOption.InstancesAndTotals,
-                    ),
+                    selector,
                     altConstantValueSelector: { metadata: queryName },
                     instanceKind: powerbi.VisualEnumerationInstanceKinds.ConstantOrRule,
                 },

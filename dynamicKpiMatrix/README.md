@@ -116,7 +116,7 @@ A borda envolve o **card interno** (valor principal + complementos), não a grad
 
 ### Formatação condicional nos complementos
 
-Em **Indicadores → Complemento**, selecione o slot e configure as cores de fonte, fundo e barra com o botão **fx** (regras nativas do Power BI). A regra vale só para aquele complemento.
+Em **Indicadores → Complemento**, selecione o indicador e o slot e configure as cores de fonte, fundo e barra com o botão **fx** (regras nativas do Power BI). A regra vale só para aquele indicador e aquele complemento.
 
 ---
 

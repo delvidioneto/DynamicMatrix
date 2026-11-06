@@ -412,15 +412,18 @@ function assert(condition: unknown, message: string): asserts condition {
             rows: {
                 root: {
                     values: {
-                        0: { value: 100, valueSourceIndex: 0 },
+                        0: {
+                            value: 100,
+                            valueSourceIndex: 0,
+                            objects: {
+                                kpiStyle: {
+                                    complement1FontColor: { solid: { color: "#107C10" } },
+                                    complement2FontColor: { solid: { color: "#D13438" } },
+                                },
+                            },
+                        },
                         1: { value: 0.62, valueSourceIndex: 1 },
                         2: { value: 0.91, valueSourceIndex: 2 },
-                    },
-                    objects: {
-                        kpiStyle: {
-                            complement1FontColor: { solid: { color: "#107C10" } },
-                            complement2FontColor: { solid: { color: "#D13438" } },
-                        },
                     },
                     children: [
                         {
@@ -477,8 +480,8 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(totalCell.complements.length === 2, "total has two complement slots");
     assert(totalCell.complements[0].value.raw === 0.62, "comp1 from root total context");
     assert(totalCell.complements[1].value.raw === 0.91, "comp2 from root total context");
-    assert(totalCell.complements[0].fontColor === "#107C10", "comp1 CF from total objects");
-    assert(totalCell.complements[1].fontColor === "#D13438", "comp2 CF from total objects");
+    assert(totalCell.complements[0].fontColor === "#107C10", "comp1 CF from kpi value on total");
+    assert(totalCell.complements[1].fontColor === "#D13438", "comp2 CF from kpi value on total");
     assert(view.rows[0].cells[0].complements[0].value.raw === 0.4, "category row unchanged");
 }
 
@@ -855,7 +858,7 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(view.totalRow!.displayMode === "image", "total image-only mode");
 }
 
-// Cor condicional (fx) vem no objeto da linha, não na célula do KPI
+// Cor condicional (fx) do complemento vem na célula do KPI
 {
     const dataView = {
         matrix: {
@@ -866,11 +869,18 @@ function assert(condition: unknown, message: string): asserts condition {
                             value: "A",
                             objects: {
                                 kpiStyle: {
-                                    complement1FontColor: { solid: { color: "#F5A623" } },
+                                    complement1FontColor: { solid: { color: "#FFFFFF" } },
                                 },
                             },
                             values: {
-                                0: { value: 10 },
+                                0: {
+                                    value: 10,
+                                    objects: {
+                                        kpiStyle: {
+                                            complement1FontColor: { solid: { color: "#F5A623" } },
+                                        },
+                                    },
+                                },
                                 1: { value: 0.07 },
                             },
                         },
@@ -912,9 +922,9 @@ function assert(condition: unknown, message: string): asserts condition {
     });
     const rowA = view.rows.find((r) => r.category === "A");
     const rowB = view.rows.find((r) => r.category === "B");
-    assert(rowA!.cells[0].complements[0].fontColor === "#F5A623", "rule color from row objects");
+    assert(rowA!.cells[0].complements[0].fontColor === "#F5A623", "rule color from kpi value");
     assert(rowA!.cells[0].complements[0].value.text.startsWith("7"), "7% display");
-    assert(rowB!.cells[0].complements[0].fontColor === "#107C10", "rule color from complement value");
+    assert(rowB!.cells[0].complements[0].fontColor == null, "complement measure color does not paint the kpi");
 }
 
 // Formatação condicional independente por complemento (slots 1 e 2)
@@ -928,14 +938,21 @@ function assert(condition: unknown, message: string): asserts condition {
                             value: "A",
                             objects: {
                                 kpiStyle: {
-                                    complement1FontColor: { solid: { color: "#AA0000" } },
-                                    complement2FontColor: { solid: { color: "#00AA00" } },
-                                    complement1BackColor: { solid: { color: "#FFEEEE" } },
-                                    complement2DataBarColor: { solid: { color: "#0000AA" } },
+                                    complement1FontColor: { solid: { color: "#FFFFFF" } },
                                 },
                             },
                             values: {
-                                0: { value: 10 },
+                                0: {
+                                    value: 10,
+                                    objects: {
+                                        kpiStyle: {
+                                            complement1FontColor: { solid: { color: "#AA0000" } },
+                                            complement2FontColor: { solid: { color: "#00AA00" } },
+                                            complement1BackColor: { solid: { color: "#FFEEEE" } },
+                                            complement2DataBarColor: { solid: { color: "#0000AA" } },
+                                        },
+                                    },
+                                },
                                 1: { value: 0.4 },
                                 2: { value: 0.9 },
                             },
@@ -983,6 +1000,111 @@ function assert(condition: unknown, message: string): asserts condition {
     assert(comps[1].dataBarColor === "#0000AA", "slot 2 bar color independent");
     assert(comps[0].dataBars !== true, "slot 1 bars stay off");
     assert(comps[1].dataBars === true, "slot 2 bars stay on");
+}
+
+// Formatação condicional do complemento é independente por indicador
+{
+    const dataView = {
+        matrix: {
+            rows: {
+                root: {
+                    children: [
+                        {
+                            value: "Linha",
+                            objects: {
+                                kpiStyle: {
+                                    complement1FontColor: { solid: { color: "#FF00FF" } },
+                                },
+                            },
+                            values: {
+                                0: {
+                                    value: 10,
+                                    objects: {
+                                        kpiStyle: {
+                                            complement1FontColor: { solid: { color: "#AA0000" } },
+                                            complement2FontColor: { solid: { color: "#00AA00" } },
+                                            complement1BackColor: { solid: { color: "#FFEEEE" } },
+                                        },
+                                    },
+                                },
+                                1: {
+                                    value: 20,
+                                    objects: {
+                                        kpiStyle: {
+                                            complement2DataBarColor: { solid: { color: "#0000AA" } },
+                                        },
+                                    },
+                                },
+                                2: {
+                                    value: 0.4,
+                                    objects: {
+                                        kpiStyle: {
+                                            complement1FontColor: { solid: { color: "#00FFFF" } },
+                                        },
+                                    },
+                                },
+                                3: { value: 0.9 },
+                            },
+                        },
+                    ],
+                },
+            },
+            valueSources: [
+                { queryName: "kpiA", displayName: "Billing", roles: { kpis: true } },
+                { queryName: "kpiB", displayName: "Margin", roles: { kpis: true } },
+                { queryName: "c1", displayName: "IBP", roles: { complements: true }, format: "0%" },
+                { queryName: "c2", displayName: "Quota", roles: { complements: true }, format: "0%" },
+            ],
+        },
+        metadata: {
+            columns: [
+                {
+                    queryName: "kpiA",
+                    roles: { kpis: true },
+                    objects: {
+                        kpiStyle: {
+                            complement1: "c1",
+                            complement2: "c2",
+                            complement1FontColor: { solid: { color: "#333333" } },
+                            complement2FontColor: { solid: { color: "#444444" } },
+                        },
+                    },
+                },
+                {
+                    queryName: "kpiB",
+                    roles: { kpis: true },
+                    objects: {
+                        kpiStyle: {
+                            complement1: "c1",
+                            complement2: "c2",
+                            complement1FontColor: { solid: { color: "#111111" } },
+                            complement2DataBars: true,
+                        },
+                    },
+                },
+                { queryName: "c1", roles: { complements: true } },
+                { queryName: "c2", roles: { complements: true } },
+            ],
+        },
+    } as unknown as powerbi.DataView;
+
+    const view = convertDataView(dataView, {
+        totalLabel: "Total",
+        sortMode: "data",
+        categoriesJson: "{}",
+        showTotal: false,
+    });
+    const cellA = view.rows[0].cells.find((c) => c.queryName === "kpiA")!;
+    const cellB = view.rows[0].cells.find((c) => c.queryName === "kpiB")!;
+    assert(cellA.complements[0].fontColor === "#AA0000", "kpi A slot 1 uses its own rule");
+    assert(cellA.complements[1].fontColor === "#00AA00", "kpi A slot 2 uses its own rule");
+    assert(cellA.complements[0].backColor === "#FFEEEE", "kpi A slot 1 back color");
+    assert(cellA.complements[1].dataBarColor == null, "kpi A slot 2 does not take kpi B bar color");
+    assert(cellB.complements[0].fontColor === "#111111", "kpi B slot 1 keeps its constant color");
+    assert(cellB.complements[1].fontColor == null, "kpi B slot 2 does not take kpi A font color");
+    assert(cellB.complements[1].dataBarColor === "#0000AA", "kpi B slot 2 uses its own bar rule");
+    assert(cellB.complements[0].dataBars !== true, "kpi B slot 1 bars stay off");
+    assert(cellB.complements[1].dataBars === true, "kpi B slot 2 bars stay on");
 }
 
 // Total Geral: a medida volta em branco no subtotal e o SVG só existe na linha

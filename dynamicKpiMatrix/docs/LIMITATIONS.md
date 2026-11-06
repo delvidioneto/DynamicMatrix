@@ -16,7 +16,7 @@ Não há well de dados dentro do painel **Formatar** — apenas no painel **Dado
 
 A API oficial de custom visuals aplica formatação condicional nativa principalmente a **cores** (`ConstantOrRule` + `fillRule`). O host avalia as regras e devolve as cores em `DataViewObjects` (nó da categoria e/ou valor da medida).
 
-**Alternativa implementada:** por complemento (slots 1 e 2), ColorPicker com botão **fx** para fonte, fundo e cor da barra; o visual lê as cores avaliadas por slot (`complementNFontColor`, `complementNBackColor`, `complementNDataBarColor`). Barras de dados usam toggle + cor (com fx). Ícones usam conjuntos fixos (direcional / semáforo / triângulos) com limiares locais — o SDK não expõe o editor de conjuntos de ícones da Matrix nativa.
+**Alternativa implementada:** por indicador e por complemento (slots 1 e 2), ColorPicker com botão **fx** para fonte, fundo e cor da barra. A regra fica no metadata do KPI e o visual lê a cor avaliada na célula desse indicador (`complementNFontColor`, `complementNBackColor`, `complementNDataBarColor`). Barras de dados usam toggle + cor (com fx). Ícones usam conjuntos fixos (direcional / semáforo / triângulos) com limiares locais — o SDK não expõe o editor de conjuntos de ícones da Matrix nativa.
 
 ## 4. Identificadores de medidas
 
